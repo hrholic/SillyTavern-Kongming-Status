@@ -147,15 +147,18 @@ export function protectedSource(raw, names) {
     }
     if (stack.length) intervals.push([begin, source.length]);
     if (!intervals.length) return null;
-    const outside = [], inside = [];
+    const outside = [], inside = [], rawOutside = [], rawInside = [];
     let last = 0;
     for (const [from, to] of intervals) {
+        rawOutside.push(source.slice(last, from));
         outside.push(comparableText(source.slice(last, from)));
+        rawInside.push(source.slice(from, to));
         inside.push(comparableText(source.slice(from, to)));
         last = to;
     }
+    rawOutside.push(source.slice(last));
     outside.push(comparableText(source.slice(last)));
-    return { outside, inside };
+    return { outside, inside, rawOutside, rawInside };
 }
 
 export function sourceAllows(text, protection) {
@@ -203,12 +206,12 @@ export function findStatusRoots(root, customSelectors = '', exclusionText = '', 
     const protectedNodes = all.filter(node => node.hasAttribute('data-kms-ignore') || hasProtectedIdentity(node, names, explicitNames));
     const hiddenNodes = all.filter(hiddenSelf);
     let protectedCount = 0;
-    function allowed(node) {
+    function allowed(node, sourceText) {
         if (node.querySelector('pre,code,script,style,textarea,input,iframe,svg,canvas')
             || names.has(literalStatus(node)?.tag)
             || protectedNodes.some(protectedNode => protectedNode.contains(node) || node.contains(protectedNode))
             || hiddenNodes.some(hiddenNode => node.contains(hiddenNode))
-            || !sourceAllows(node.textContent, sourceProtection)) {
+            || !sourceAllows(sourceText ?? node.textContent, sourceProtection)) {
             protectedCount++;
             return false;
         }
@@ -230,7 +233,7 @@ export function findStatusRoots(root, customSelectors = '', exclusionText = '', 
         } catch { selectorError = '选择器格式不正确；自动识别仍然有效。'; }
     }
     for (const [node, reason] of additional) {
-        if (!blocked(node, root) && allowed(node)) found.set(node, reason);
+        if (!blocked(node, root) && allowed(node, typeof reason==='object'?reason.sourceText:undefined)) found.set(node, typeof reason==='object'?reason.reason:reason);
     }
     // One outer card, not a card for every nested status row/value.
     for (const node of found.keys()) {

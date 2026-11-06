@@ -121,3 +121,36 @@ test('stripped thought/control status and blueprint remain protected', () => {
         t.controller.stop(); t.dom.window.close();
     }
 });
+
+test('visible readable non-helper iframe accepts only mapped existing status container', () => {
+    const t = setup('<div class="story-text">正文故事</div><section class="renamed-panel">地点：花园<br>心情：平静</section><div class="choices-section">选择离开</div>', '<content>正文故事</content><evening>地点：花园\n心情：平静</evening>');
+    t.frame.id = 'public-html-renderer'; t.controller.refresh();
+    assert.equal(t.controller.count(), 1);
+    assert.ok(t.document.querySelector('.renamed-panel').classList.contains('kms-frame-shell'));
+    assert.equal(t.document.querySelector('.story-text').classList.contains('kms-frame-shell'), false);
+    assert.equal(t.document.querySelector('.choices-section').classList.contains('kms-frame-shell'), false);
+    assert.equal(t.document.body.className, '');
+    t.frame.removeAttribute('id'); t.controller.refresh(); assert.equal(t.controller.count(), 1);
+    t.frame.name = 'TH-script--background'; t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    t.frame.name = ''; t.frame.hidden = true; t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    t.controller.stop(); t.dom.window.close();
+});
+
+test('non-helper mixed HTML status remains scoped and raw protected text cannot become a tail', () => {
+    const t = setup('<div class="story-text">正文故事</div><section class="status-section">地点：花园<br>心情：平静</section>', '<content>正文故事</content><status>地点：花园\n心情：平静</status>');
+    t.frame.id = 'html-inject'; t.controller.refresh(); assert.equal(t.controller.count(), 1);
+    t.settings.excluded = 'status-section'; t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    t.settings.excluded = ''; t.setRaw('<content>正文故事 地点：花园 心情：平静</content>');
+    t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    t.setRaw('<think><evening>地点：花园\n心情：平静</evening></think>');
+    t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    t.controller.stop(); t.dom.window.close();
+});
+
+test('tail mapping never wraps loose groups or styles a whole document', () => {
+    const t = setup('地点：花园<br>心情：平静', '<content>正文</content><evening>地点：花园\n心情：平静</evening>');
+    t.frame.id = 'other'; t.controller.refresh(); assert.equal(t.controller.count(), 0);
+    assert.equal(t.document.body.querySelector('.kms-frame-shell'), null);
+    assert.equal(t.document.body.className, '');
+    t.controller.stop(); t.dom.window.close();
+});

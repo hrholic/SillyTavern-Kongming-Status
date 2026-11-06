@@ -1,9 +1,9 @@
-import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.0';
-import { planTailStatuses } from './tail.js?v=0.3.0';
-import { createFrameController } from './frames.js?v=0.3.0';
+import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.1';
+import { planTailStatuses } from './tail.js?v=0.3.1';
+import { createFrameController } from './frames.js?v=0.3.1';
 
 const KEY = 'kongming_status';
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 let context;
 let settings = { ...DEFAULTS };
 let started = false;
@@ -127,12 +127,13 @@ function scan(message) {
     const raw = rawMessageFor(message);
     const plan=settings.enabled&&eligible(message)?planTailStatuses(message,raw,settings.excluded):{existing:new Map(),groups:[]};
     const additional=new Map(),sourceTags=new Map(),created=[];
-    for(const [node,item] of plan.existing){additional.set(node,item.reason);sourceTags.set(node,item.tag);}
+    for(const [node,item] of plan.existing){additional.set(node,item);sourceTags.set(node,item.tag);}
     for(const group of plan.groups){
-        if(!group.nodes.length||!group.nodes.every(node=>node.parentNode===message))continue;
+        const parent=group.parent||message;
+        if(!message.contains(parent)||!group.nodes.length||!group.nodes.every(node=>node.parentNode===parent))continue;
         const wrapper=element('section');wrapper.setAttribute('data-kms-tail-wrapper','');ownedWrappers.add(wrapper);
         group.nodes[0].before(wrapper);wrapper.append(...group.nodes);created.push(wrapper);
-        additional.set(wrapper,group.reason);sourceTags.set(wrapper,group.tag);
+        additional.set(wrapper,group);sourceTags.set(wrapper,group.tag);
     }
     const { roots, protectedCount = 0 } = settings.enabled && eligible(message)
         ? findStatusRoots(message, settings.selectors, settings.excluded, raw, additional) : { roots: new Map() };

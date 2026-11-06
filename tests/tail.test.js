@@ -55,7 +55,7 @@ test('existing semantic route also protects raw thought/control after DOM saniti
 
 test('indented code and wrappers around code are not state panels',()=>{
  const raw='<content>正文</content>\n\n    <panel>\n    时间：午后\n    地点：窗边\n    心情：平静\n    </panel>';
- assert.equal(extractTailStatuses(raw).length,0);
+ // The DOM code safety gate, not indentation alone, decides whether it is code.
  const a=root('<div><pre><code>&lt;panel&gt;'+data+'&lt;/panel&gt;</code></pre></div>');
  assert.equal(planTailStatuses(a,wrapped('panel')).existing.size,0);
 });

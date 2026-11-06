@@ -1,5 +1,6 @@
-/** Same-origin Tavern Helper message frames only. Never changes frame content or sources. */
-import { findStatusRoots, excludedNames, protectedSource, sourceAllows } from './core.js?v=0.3.0';
+/** Visible same-origin message frames only; background helper frames are excluded. Never changes frame content or sources. */
+import { findStatusRoots, excludedNames, protectedSource, sourceAllows, isSafeStatusNode } from './core.js?v=0.3.1';
+import { planTailStatuses } from './tail.js?v=0.3.1';
 
 const MARK = 'kms-frame-shell';
 const PROTECTED = 'content context think thinking thought thoughts analysis reasoning preprint ecot cot scratchpad scratch_pad chain_of_thought chain-of-thought internal internal_thought internal_thoughts internal_reasoning hidden_thought hidden_thoughts thinking_process reasoning_process system system_prompt instructions instruction control tool tool_call tool_calls function_call';
@@ -112,6 +113,17 @@ export function createFrameController({ getSettings, getMode = () => 'light', ge
                 && visible(root) && !blockedIdentity(root, names) && !blockedIdentity(state.frame, names)
                 && sourceAllows(visibleText(root), protection)) roots.add(root);
         }
+        // Consume only source-mapped existing elements. Never wrap groups, style body,
+        // or copy raw source into the frame. Blueprint frames use their stricter path.
+        if (!blueprints.length && !blockedIdentity(state.frame, names)) {
+            const exclusion = `${PROTECTED} ${settings.excluded || ''}`;
+            const plan = planTailStatuses(doc.body, raw, exclusion, { existingOnly: true });
+            for (const [root, evidence] of plan.existing) {
+                if (root !== doc.body && visible(root) && isSafeStatusNode(doc.body, root, exclusion)
+                    && !blockedIdentity(root, names)
+                    && sourceAllows(evidence.sourceText ?? visibleText(root), protection)) roots.add(root);
+            }
+        }
         if (blueprints.length === 1 && blueprintSourceAllowed(raw, names)) {
             const root = blueprints[0];
             if (visible(root) && root.querySelector('.tb-heading') && root.querySelector('.tb-meta')
@@ -147,8 +159,9 @@ export function createFrameController({ getSettings, getMode = () => 'light', ge
         const wanted = new Map();
         if (getSettings().enabled) for (const message of messages) {
             if (!message.isConnected || !visible(message)) continue;
-            for (const frame of message.querySelectorAll('iframe[id^="TH-message--"]')) {
-                if (visible(frame)) wanted.set(frame, message);
+            for (const frame of message.querySelectorAll('iframe')) {
+                if (!frame.id.startsWith('TH-script--') && !frame.name.startsWith('TH-script--')
+                    && visible(frame)) wanted.set(frame, message);
             }
         }
         for (const state of frames.values()) if (!wanted.has(state.frame)) remove(state);
