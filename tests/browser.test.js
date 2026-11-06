@@ -31,8 +31,21 @@ async function setting(key, value) {
 }
 try {
     await page.goto(`http://127.0.0.1:${server.address().port}/tests/fixture.html`);
-    await page.waitForSelector('.kms-card');
+    await page.waitForSelector('#chat .kms-card');
     const originalChat = await page.evaluate(() => JSON.stringify(window.chatFixture));
+    await check('visible enabled state survives collapsed settings; switch is accessible', async () => {
+        assert.equal(await page.locator('.kms-settings-title').textContent(), '统一状态栏');
+        assert.equal(await page.locator('.kms-enable-badge').textContent(), '已启用');
+        await page.locator('#kongming-status-settings').evaluate(node => { node.open = false; });
+        assert.equal(await page.locator('.kms-enable-badge').isVisible(), true);
+        await page.locator('#kongming-status-settings').evaluate(node => { node.open = true; });
+        await page.locator('[data-kms-setting="enabled"]').focus();
+        await page.keyboard.press('Space'); await settle();
+        assert.equal(await page.locator('.kms-enable-badge').textContent(), '已关闭');
+        assert.match(await page.locator('.kms-count').textContent(), /已关闭/);
+        await page.keyboard.press('Space'); await settle();
+        assert.equal(await page.locator('.kms-enable-badge').textContent(), '已启用');
+    });
     await check('named container, details, captioned table, nested outer', async () => {
         for (const id of ['named', 'fold', 'status-table', 'nested']) assert.equal(await has(id), true, id);
         assert.equal(await page.locator('#nested .kms-card').count(), 0);
@@ -50,6 +63,17 @@ try {
         await setting('theme', 'dark');
         assert.equal(await page.locator('#named').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(23, 25, 29)');
         await setting('theme', 'auto');
+    });
+    await check('fixed dark/light templates have different surfaces and visible geometry', async () => {
+        await setting('template','slate');
+        assert.equal(await page.locator('#named').evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(20, 28, 34)');
+        assert.equal(await page.locator('#named').evaluate(node=>getComputedStyle(node).borderLeftWidth),'3px');
+        assert.equal(await page.locator('[data-kms-setting="theme"]').isDisabled(),true);
+        await setting('template','paper');
+        assert.equal(await page.locator('#named').evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(255, 255, 255)');
+        assert.equal(await page.locator('#named').evaluate(node=>getComputedStyle(node).borderTopWidth),'3px');
+        assert.equal(await page.locator('.kms-preview').evaluate(node=>node.closest('#chat')),null);
+        await setting('template','classic');
     });
     await check('custom selector catches unfamiliar wrapper', async () => {
         await setting('selectors', '.bespoke-panel'); assert.equal(await has('unusual'), true);
@@ -133,6 +157,13 @@ try {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     });
     await page.screenshot({path:resolve(base,'test-results/mobile-light.png'),fullPage:true});
+    for (const template of ['slate','paper']) {
+        await setting('template',template);
+        await check(`390px ${template} template has no horizontal overflow`, async () => {
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        });
+        await page.screenshot({path:resolve(base,`test-results/mobile-${template}.png`),fullPage:true});
+    }
     await check('host disable hook removes classes/listeners and does not restart', async () => {
         await page.evaluate(async () => (await import('../index.js')).onDisable()); await settle();
         assert.equal(await page.locator('.kms-card').count(), 0);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isStatusLabel, normalizeSettings, textColorMeansDark, excludedNames,
+import { isStatusLabel, normalizeSettings, TEMPLATES, textColorMeansDark, excludedNames,
     protectedSource, sourceAllows, comparableText } from '../core.js';
 
 test('recognizes exact short status headings, including decorated labels', () => {
@@ -15,8 +15,33 @@ test('does not mistake prose, HP words, or generic headings for status panels', 
 });
 test('settings reject invalid types and clamp selector/exclusion length', () => {
     assert.deepEqual(normalizeSettings({ enabled: 'false', theme: 'blue', deep: 1 }),
-        { enabled: true, theme: 'auto', deep: false, selectors: '', excluded: '' });
+        { enabled: true, theme: 'auto', template: 'classic', deep: false, selectors: '', excluded: '' });
     assert.equal(normalizeSettings({ selectors: 'x'.repeat(1200) }).selectors.length, 1000);
+});
+test('legacy settings retain enabled state, theme and exclusions while defaulting to original template', () => {
+    const migrated = normalizeSettings({ enabled: false, theme: 'dark', deep: true, excluded: 'special-panel', selectors: '#panel' });
+    assert.deepEqual(migrated, { enabled: false, theme: 'dark', template: 'classic', deep: true, excluded: 'special-panel', selectors: '#panel' });
+    assert.equal(normalizeSettings(null).template, 'classic');
+    assert.equal(normalizeSettings({ template: '__proto__' }).template, 'classic');
+    for (const template of ['classic','slate','paper']) assert.equal(normalizeSettings({ template }).template, template);
+});
+test('new templates have distinct fixed modes while original keeps its day/night preference', () => {
+    assert.equal(TEMPLATES.slate.mode, 'dark');
+    assert.equal(TEMPLATES.paper.mode, 'light');
+    assert.equal(TEMPLATES.classic.mode, null);
+});
+test('new template text, muted labels and accents meet WCAG AA contrast on their base surfaces', () => {
+    function luminance(hex) {
+        const values = hex.match(/[0-9a-f]{2}/gi).map(value => parseInt(value,16)/255)
+            .map(value => value <= 0.04045 ? value/12.92 : ((value+0.055)/1.055)**2.4);
+        return values[0]*0.2126+values[1]*0.7152+values[2]*0.0722;
+    }
+    for (const [background, colors] of [['#141c22',['#e5eaed','#aab8c1','#a8c5cc']],['#ffffff',['#252c34','#65717e','#465e73']]]) {
+        for (const color of colors) {
+            const a=luminance(background),b=luminance(color);
+            assert.ok((Math.max(a,b)+0.05)/(Math.min(a,b)+0.05)>=4.5, `${color} on ${background}`);
+        }
+    }
 });
 test('day/night derived from text luminance, with unknown-color fallback', () => {
     assert.equal(textColorMeansDark('rgba(236, 234, 230, 1)'), true);

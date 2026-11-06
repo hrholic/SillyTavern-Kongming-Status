@@ -2,9 +2,15 @@
 export const DEFAULTS = Object.freeze({
     enabled: true,
     theme: 'auto',
+    template: 'classic',
     deep: false,
     selectors: '',
     excluded: '',
+});
+export const TEMPLATES = Object.freeze({
+    classic: { label: '原有 · 空明', description: '柔和圆角，保留原来的日夜配色。', mode: null },
+    slate: { label: '墨夜 · 暗色', description: '炭黑底、细侧线与紧凑标题。', mode: 'dark' },
+    paper: { label: '白纸 · 亮色', description: '纯白底、细顶线与清爽留白。', mode: 'light' },
 });
 // Only nodes created by this module's renderer can be treated as hidden markers.
 export const ownedMarkers = new WeakSet();
@@ -18,9 +24,11 @@ const TOKEN = /(?:^|[\s_-])(?:status(?:[\s_-]?(?:bar|panel|box|card|sheet|window
 const CJK = /状态栏|状态面板|角色状态|人物状态|角色信息|人物信息|属性面板/;
 
 export function normalizeSettings(value = {}) {
+    if (!value || typeof value !== 'object') value = {};
     return {
         enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
         theme: ['auto', 'light', 'dark'].includes(value.theme) ? value.theme : 'auto',
+        template: Object.hasOwn(TEMPLATES, value.template) ? value.template : 'classic',
         deep: value.deep === true,
         selectors: typeof value.selectors === 'string' ? value.selectors.slice(0, 1000) : '',
         excluded: typeof value.excluded === 'string' ? value.excluded.slice(0, 2000) : '',

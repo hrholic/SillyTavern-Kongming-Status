@@ -1,5 +1,9 @@
 /* Original, scoped CSS. The Kongming palette is credited in README.md. */
-#chat {
+:is(#chat, #kongming-status-settings .kms-preview) {
+    --kms-radius: 12px;
+    --kms-inner-radius: 11px;
+    --kms-pad-x: 16px;
+    --kms-pad-y: 14px;
     --kms-ink: #14161a;
     --kms-muted: #14161ab8;
     --kms-line: #14161a24;
@@ -9,7 +13,7 @@
     --kms-shadow: 0 8px 24px #14161a0d;
     --kms-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
 }
-#chat[data-kms-mode="dark"] {
+:is(#chat, #kongming-status-settings .kms-preview)[data-kms-mode="dark"] {
     --kms-ink: #eceae6;
     --kms-muted: #eceae6b8;
     --kms-line: #eceae624;
@@ -18,45 +22,45 @@
     --kms-surface: #17191d;
     --kms-shadow: 0 8px 24px #00000026;
 }
-#chat .mes_text .kms-card {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card {
     box-sizing: border-box;
     color: var(--kms-ink) !important;
     background-color: var(--kms-surface) !important;
     border: 1px solid var(--kms-line) !important;
-    border-radius: 12px !important;
+    border-radius: var(--kms-radius) !important;
     box-shadow: var(--kms-shadow) !important;
     font-family: var(--kms-font);
     line-height: 1.7;
-    padding: 14px 16px;
+    padding: var(--kms-pad-y) var(--kms-pad-x);
     margin-block: 12px;
     min-width: 0;
     max-width: 100%;
     overflow-wrap: anywhere;
 }
-#chat .mes_text .kms-card[data-kms-reason="可见标签"] { white-space: pre-wrap; }
-#chat .mes_text details.kms-card { padding: 0; }
-#chat .mes_text details.kms-card > summary {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card[data-kms-reason="可见标签"] { white-space: pre-wrap; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) details.kms-card { padding: 0; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) details.kms-card > summary {
     cursor: pointer;
-    padding: 12px 16px;
+    padding: 12px var(--kms-pad-x);
     font: 600 0.95em/1.6 var(--kms-font);
     color: var(--kms-accent) !important;
     background-color: transparent !important;
-    border-radius: 11px;
+    border-radius: var(--kms-inner-radius);
 }
-#chat .mes_text details.kms-card[open] { padding: 0 16px 14px; }
-#chat .mes_text details.kms-card[open] > summary {
-    margin-inline: -16px;
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) details.kms-card[open] { padding: 0 var(--kms-pad-x) var(--kms-pad-y); }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) details.kms-card[open] > summary {
+    margin-inline: calc(-1 * var(--kms-pad-x));
     margin-bottom: 10px;
     border-bottom: 1px solid var(--kms-line);
-    border-radius: 11px 11px 0 0;
+    border-radius: var(--kms-inner-radius) var(--kms-inner-radius) 0 0;
 }
-#chat .mes_text .kms-card :is(h1,h2,h3,h4,h5,h6,legend,caption) {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card :is(h1,h2,h3,h4,h5,h6,legend,caption) {
     color: var(--kms-accent);
     font-family: var(--kms-font);
     letter-spacing: 0.04em;
 }
-#chat .mes_text .kms-card :is(img,video) { max-width: 100%; height: auto; }
-#chat .mes_text table.kms-card {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card :is(img,video) { max-width: 100%; height: auto; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) table.kms-card {
     width: fit-content;
     max-width: 100%;
     overflow-x: auto;
@@ -64,38 +68,119 @@
     border-spacing: 0;
     padding: 4px;
 }
-#chat .mes_text .kms-card table {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card table {
     max-width: 100%;
     overflow-x: auto;
 }
-#chat .mes_text .kms-card :is(th,td) {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card :is(th,td) {
     border-color: var(--kms-line);
     padding: 7px 10px;
 }
-#chat .mes_text .kms-card th { color: var(--kms-accent); background-color: var(--kms-soft); }
-#chat .mes_text .kms-card dt { color: var(--kms-muted); font-size: 0.85em; }
-#chat .mes_text .kms-card dd { margin-inline-start: 0; margin-bottom: 8px; }
-#chat .mes_text .kms-card a { color: var(--kms-accent); }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card th { color: var(--kms-accent); background-color: var(--kms-soft); }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card dt { color: var(--kms-muted); font-size: 0.85em; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card dd { margin-inline-start: 0; margin-bottom: 8px; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-card a { color: var(--kms-accent); }
 /* Opt-in. Default mode deliberately preserves custom inner colors and layouts. */
-#chat .mes_text .kms-deep :is(div,section,article,p,span,table,tr,td,th,dl,dt,dd,li,label) {
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-deep :is(div,section,article,p,span,table,tr,td,th,dl,dt,dd,li,label) {
     color: var(--kms-ink) !important;
     background-color: transparent !important;
     border-color: var(--kms-line) !important;
 }
-#chat .mes_text .kms-deep :is(h1,h2,h3,h4,h5,h6,summary,legend,caption) { color: var(--kms-accent) !important; }
-.kms-settings { border: 1px solid var(--SmartThemeBorderColor, #8885); border-radius: 8px; margin-block: 8px; }
-.kms-settings > summary { padding: 10px; font-weight: 600; cursor: pointer; }
-.kms-settings-body { padding: 0 10px 12px; display: grid; gap: 10px; }
+:is(#chat .mes_text, #kongming-status-settings .kms-preview) .kms-deep :is(h1,h2,h3,h4,h5,h6,summary,legend,caption) { color: var(--kms-accent) !important; }
+/* Additional templates: distinct geometry and type, not just different palettes. */
+:is(#chat, #kongming-status-settings .kms-preview)[data-kms-template="slate"] {
+    --kms-ink: #e5eaed;
+    --kms-muted: #aab8c1;
+    --kms-line: #34424d;
+    --kms-accent: #a8c5cc;
+    --kms-soft: #202d35;
+    --kms-surface: #141c22;
+    --kms-shadow: none;
+    --kms-radius: 4px;
+    --kms-inner-radius: 3px;
+    --kms-pad-x: 15px;
+    --kms-pad-y: 12px;
+}
+:is(#chat, #kongming-status-settings .kms-preview)[data-kms-template="paper"] {
+    --kms-ink: #252c34;
+    --kms-muted: #65717e;
+    --kms-line: #dce1e6;
+    --kms-accent: #465e73;
+    --kms-soft: #f2f5f7;
+    --kms-surface: #ffffff;
+    --kms-shadow: none;
+    --kms-radius: 2px;
+    --kms-inner-radius: 1px;
+    --kms-pad-x: 19px;
+    --kms-pad-y: 17px;
+}
+:is(#chat[data-kms-template="slate"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="slate"]) .kms-card {
+    border-inline-start: 3px solid var(--kms-accent) !important;
+    line-height: 1.6;
+}
+:is(#chat[data-kms-template="slate"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="slate"]) .kms-card :is(h1,h2,h3,h4,h5,h6,legend,caption,summary) {
+    font-family: "SFMono-Regular", Consolas, "Microsoft YaHei", monospace;
+    font-size: 0.9em;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+}
+:is(#chat[data-kms-template="slate"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="slate"]) .kms-card > :is(h1,h2,h3,h4,h5,h6) {
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--kms-line);
+    margin-block: 0 11px;
+}
+:is(#chat[data-kms-template="paper"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="paper"]) .kms-card {
+    border-top: 3px solid var(--kms-accent) !important;
+    line-height: 1.85;
+}
+:is(#chat[data-kms-template="paper"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="paper"]) .kms-card :is(h1,h2,h3,h4,h5,h6,legend,caption,summary) {
+    font-family: Georgia, "Songti SC", "Noto Serif SC", SimSun, serif;
+    font-weight: 600;
+    font-size: 1.05em;
+    letter-spacing: 0.05em;
+}
+:is(#chat[data-kms-template="paper"] .mes_text, #kongming-status-settings .kms-preview[data-kms-template="paper"]) .kms-card > :is(h1,h2,h3,h4,h5,h6) {
+    padding-bottom: 10px;
+    margin-block: 0 14px;
+    border-bottom: 1px solid var(--kms-line);
+}
+.kms-settings { border: 1px solid var(--SmartThemeBorderColor, #8885); border-radius: 9px; margin-block: 8px; }
+.kms-settings > summary { padding: 12px; font-weight: 600; cursor: pointer; }
+.kms-settings .kms-settings-title { margin-inline-end: 10px; }
+.kms-settings .kms-enable-badge { display: inline-block; padding: 2px 8px; border: 1px solid #8b969f80; border-radius: 20px; background: #727e881a; font-size: 0.78em; font-weight: 650; white-space: nowrap; }
+.kms-settings[data-kms-enabled="true"] .kms-enable-badge { color: #c5f0dd; background: #215743; border-color: #37755c; }
+.kms-settings[data-kms-enabled="false"] .kms-enable-badge { color: #e1e5e9; background: #505861; border-color: #68717b; }
+.kms-settings-body { padding: 0 12px 14px; display: grid; gap: 10px; }
+.kms-settings .kms-enable-control { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--SmartThemeBorderColor, #8885); border-radius: 8px; cursor: pointer; }
+.kms-settings .kms-enable-copy { display: grid; gap: 3px; min-width: 0; }
+.kms-settings .kms-enable-copy small { opacity: 0.75; font-size: 0.78em; }
+.kms-settings .kms-switch-input { position: absolute; inset-inline-end: 12px; width: 58px; height: 32px; margin: 0; opacity: 0; cursor: pointer; }
+.kms-settings .kms-switch-track { position: relative; flex: 0 0 58px; height: 32px; border-radius: 16px; background: #626d78; color: #fff; box-shadow: inset 0 0 0 1px #ffffff30; pointer-events: none; }
+.kms-settings .kms-switch-track::after { content: ""; position: absolute; left: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
+.kms-settings .kms-switch-word { position: absolute; right: 9px; top: 5px; font: 600 12px/22px sans-serif; }
+.kms-settings .kms-switch-input:checked + .kms-switch-track { background: #26694e; }
+.kms-settings .kms-switch-input:checked + .kms-switch-track::after { left: 30px; }
+.kms-settings .kms-switch-input:checked + .kms-switch-track .kms-switch-word { left: 9px; right: auto; }
+.kms-settings .kms-switch-input:focus-visible + .kms-switch-track { outline: 2px solid currentColor; outline-offset: 3px; }
 .kms-settings .kms-field { display: grid; gap: 5px; }
+.kms-settings :is(select,input,textarea) { box-sizing: border-box; max-width: 100%; }
+.kms-settings .kms-field select { width: 100%; min-height: 36px; }
 .kms-settings .kms-help { margin: 0; font-size: 0.85em; opacity: 0.8; }
+.kms-settings :is(.kms-template-description,.kms-preview-note,.kms-theme-note) { margin: 0; font-size: 0.8em; line-height: 1.5; opacity: 0.8; }
+.kms-settings .kms-preview { padding: 8px; border: 1px dashed var(--SmartThemeBorderColor, #8885); border-radius: 8px; min-width: 0; }
+.kms-settings .kms-preview .kms-card { margin: 0; }
+.kms-settings .kms-preview h4 { margin-block: 0 10px; }
+.kms-settings .kms-preview dl { margin-block: 0; }
+.kms-settings .kms-preview dd:last-child { margin-bottom: 0; }
 .kms-settings .kms-error { font-size: 0.85em; color: #d87970; }
 .kms-settings .kms-error:empty { display: none; }
 .kms-settings .kms-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.kms-settings .kms-count { font-size: 0.85em; }
+.kms-settings .kms-count { margin: 0; font-size: 0.86em; line-height: 1.65; }
 @media (max-width: 480px) {
-    #chat .mes_text .kms-card { padding: 11px 12px; border-radius: 10px !important; }
-    #chat .mes_text details.kms-card { padding: 0; }
-    #chat .mes_text details.kms-card[open] { padding: 0 12px 12px; }
-    #chat .mes_text details.kms-card > summary { padding: 11px 12px; }
-    #chat .mes_text details.kms-card[open] > summary { margin-inline: -12px; }
+    :is(#chat, #kongming-status-settings .kms-preview) { --kms-pad-x: 12px; --kms-pad-y: 11px; }
+    :is(#chat, #kongming-status-settings .kms-preview)[data-kms-template="classic"] { --kms-radius: 10px; --kms-inner-radius: 9px; }
+    :is(#chat, #kongming-status-settings .kms-preview)[data-kms-template="slate"] { --kms-pad-x: 12px; --kms-pad-y: 11px; }
+    :is(#chat, #kongming-status-settings .kms-preview)[data-kms-template="paper"] { --kms-pad-x: 14px; --kms-pad-y: 13px; }
+    .kms-settings .kms-enable-control { padding: 10px; }
+    .kms-settings .kms-enable-copy small { font-size: 0.75em; }
 }

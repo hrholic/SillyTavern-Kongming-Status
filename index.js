@@ -1,4 +1,4 @@
-import { DEFAULTS, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js';
+import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js';
 
 const KEY = 'kongming_status';
 let context;
@@ -77,6 +77,7 @@ function scan(message) {
 }
 
 function mode() {
+    if (TEMPLATES[settings.template].mode) return TEMPLATES[settings.template].mode;
     if (settings.theme !== 'auto') return settings.theme;
     const style = getComputedStyle(document.body);
     const smart = style.getPropertyValue('--SmartThemeBodyColor').trim();
@@ -86,7 +87,39 @@ function mode() {
 
 function applyTheme() {
     const chat = document.getElementById('chat');
-    if (chat) chat.setAttribute('data-kms-mode', mode());
+    const resolvedMode = mode();
+    for (const target of [chat, settingsPanel?.querySelector('.kms-preview')]) {
+        if (!target) continue;
+        target.setAttribute('data-kms-mode', resolvedMode);
+        target.setAttribute('data-kms-template', settings.template);
+    }
+}
+
+function refreshControls() {
+    if (!settingsPanel) return;
+    settingsPanel.setAttribute('data-kms-enabled', String(settings.enabled));
+    const badge = settingsPanel.querySelector('.kms-enable-badge');
+    if (badge) badge.textContent = settings.enabled ? '已启用' : '已关闭';
+    const input = settingsPanel.querySelector('[data-kms-setting="enabled"]');
+    if (input) { input.checked = settings.enabled; input.setAttribute('aria-checked', String(settings.enabled)); }
+    const switchWord = settingsPanel.querySelector('.kms-switch-word');
+    if (switchWord) switchWord.textContent = settings.enabled ? '开' : '关';
+    const count = settingsPanel.querySelector('.kms-count');
+    if (count && !count.textContent) count.textContent = settings.enabled ? '已启用，正在识别当前聊天。' : '已关闭，保留原有显示。';
+    const template = TEMPLATES[settings.template];
+    const theme = settingsPanel.querySelector('[data-kms-setting="theme"]');
+    if (theme) theme.disabled = Boolean(template.mode);
+    const themeNote = settingsPanel.querySelector('.kms-theme-note');
+    if (themeNote) themeNote.textContent = template.mode
+        ? `这个模板固定为${template.mode === 'dark' ? '暗色' : '亮色'}；原有模板的日夜偏好会保留。`
+        : '可跟随酒馆，也可固定日间或夜间。';
+    const description = settingsPanel.querySelector('.kms-template-description');
+    if (description) description.textContent = template.description;
+    const previewNote = settingsPanel.querySelector('.kms-preview-note');
+    if (previewNote) previewNote.textContent = settings.enabled
+        ? '样式预览 · 示例内容，不属于聊天记录'
+        : '样式预览 · 已关闭，以下样式未应用到聊天';
+    applyTheme();
 }
 
 function refreshCount() {
@@ -94,9 +127,10 @@ function refreshCount() {
     if (!output) return;
     const count = [...decorated].filter(node => node.isConnected).length;
     const skipped = [...protectedCounts].filter(([node]) => node.isConnected).reduce((sum, [, n]) => sum + n, 0);
-    output.textContent = settings.enabled
-        ? `当前已美化 ${count} 个状态栏。${skipped ? `正文保护 / 排除名单保留了 ${skipped} 个候选容器。` : ''}`
+    const text = settings.enabled
+        ? `${count ? `已启用，当前已美化 ${count} 个状态栏。` : '已启用，当前未识别到可美化的状态栏。'}${skipped ? `正文保护 / 排除名单保留了 ${skipped} 个候选容器。` : ''}`
         : '已关闭，原有显示已恢复。';
+    if (output.textContent !== text) output.textContent = text;
 }
 
 function flush() {
@@ -124,6 +158,7 @@ function save() {
         context.extensionSettings[KEY] = { ...settings };
         context.saveSettingsDebounced?.();
     }
+    refreshControls();
     schedule(true);
 }
 
@@ -133,8 +168,46 @@ function buildSettings() {
     if (!target || settingsPanel?.isConnected) return;
     settingsPanel = element('details', 'kms-settings');
     settingsPanel.id = 'kongming-status-settings';
-    settingsPanel.append(element('summary', '', '空明 · 状态栏统一美化'));
+    settingsPanel.open = true;
+    const heading = element('summary', 'kms-settings-heading');
+    const badge = element('span', 'kms-enable-badge'); badge.setAttribute('role', 'status');
+    heading.append(element('span', 'kms-settings-title', '统一状态栏'), badge);
+    settingsPanel.append(heading);
     const content = element('div', 'kms-settings-body');
+
+    const enableRow = element('label', 'kms-enable-control');
+    const enableText = element('span', 'kms-enable-copy');
+    enableText.append(element('strong', '', '启用统一美化'), element('small', '', '仅处理助手消息中的已识别状态栏'));
+    const enableInput = element('input', 'kms-switch-input');
+    enableInput.type = 'checkbox'; enableInput.checked = settings.enabled;
+    enableInput.dataset.kmsSetting = 'enabled'; enableInput.setAttribute('role', 'switch');
+    enableInput.setAttribute('aria-label', '启用统一美化');
+    enableInput.addEventListener('change', () => { settings.enabled = enableInput.checked; save(); });
+    const switchTrack = element('span', 'kms-switch-track'); switchTrack.setAttribute('aria-hidden', 'true');
+    switchTrack.append(element('span', 'kms-switch-word'));
+    enableRow.append(enableText, enableInput, switchTrack); content.append(enableRow);
+    const count = element('p', 'kms-count'); count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite');
+    content.append(count);
+
+    const templateLabel = element('label', 'kms-field', '样式模板');
+    const templateSelect = element('select', 'text_pole'); templateSelect.dataset.kmsSetting = 'template';
+    for (const [value, item] of Object.entries(TEMPLATES)) {
+        const option = element('option', '', item.label); option.value = value; templateSelect.append(option);
+    }
+    templateSelect.value = settings.template;
+    templateSelect.addEventListener('change', () => { settings.template = templateSelect.value; save(); });
+    templateLabel.append(templateSelect); content.append(templateLabel, element('p', 'kms-template-description'));
+
+    const preview = element('div', 'kms-preview');
+    preview.setAttribute('aria-label', '当前模板的静态样式预览');
+    const previewCard = element('section', 'kms-card');
+    previewCard.append(element('h4', '', '状态栏预览'));
+    const previewFields = element('dl');
+    for (const [key, value] of [['地点', '窗边'], ['心情', '平静'], ['体力', '80 / 100']]) {
+        previewFields.append(element('dt', '', key), element('dd', '', value));
+    }
+    previewCard.append(previewFields); preview.append(previewCard);
+    content.append(preview, element('p', 'kms-preview-note'));
 
     function checkbox(title, key) {
         const label = element('label', 'checkbox_label');
@@ -143,15 +216,14 @@ function buildSettings() {
         input.addEventListener('change', () => { settings[key] = input.checked; save(); });
         label.append(input, element('span', '', title)); content.append(label);
     }
-    checkbox('启用（仅助手消息）', 'enabled');
-    const label = element('label', 'kms-field', '配色');
+    const label = element('label', 'kms-field', '原有模板 · 日夜配色');
     const select = element('select', 'text_pole'); select.dataset.kmsSetting = 'theme';
-    for (const [value, text] of [['auto', '跟随酒馆'], ['light', '空明 · 日间'], ['dark', '空明 · 夜间']]) {
+    for (const [value, text] of [['auto', '跟随酒馆'], ['light', '日间'], ['dark', '夜间']]) {
         const option = element('option', '', text); option.value = value; select.append(option);
     }
     select.value = settings.theme;
     select.addEventListener('change', () => { settings.theme = select.value; save(); });
-    label.append(select); content.append(label);
+    label.append(select); content.append(label, element('p', 'kms-theme-note'));
     checkbox('深入配色（覆盖内部文字与底色，可能改变原栏配色）', 'deep');
     const custom = element('label', 'kms-field', '额外状态栏选择器（选填）');
     const input = element('input', 'text_pole'); input.type = 'text'; input.maxLength = 1000;
@@ -176,8 +248,9 @@ function buildSettings() {
     const actions = element('div', 'kms-actions');
     const rescan = element('button', 'menu_button', '重新识别'); rescan.type = 'button';
     rescan.addEventListener('click', () => schedule(true));
-    actions.append(rescan, element('span', 'kms-count'));
+    actions.append(rescan);
     content.append(actions); settingsPanel.append(content); target.append(settingsPanel);
+    refreshControls();
 }
 
 function onMutations(records) {
@@ -232,6 +305,7 @@ export function stop() {
     listeners.length = 0;
     for (const node of [...decorated]) unstyle(node);
     document.getElementById('chat')?.removeAttribute('data-kms-mode');
+    document.getElementById('chat')?.removeAttribute('data-kms-template');
     settingsPanel?.remove(); settingsPanel = null;
     dirty.clear(); fullScan = true; started = false;
     protectedCounts.clear();

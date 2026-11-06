@@ -7,6 +7,7 @@ const fixture = await readFile(new URL('./fixture.html', import.meta.url), 'utf8
 const css = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 const dom = new JSDOM(fixture, { url: 'http://localhost/tests/fixture.html', runScripts: 'dangerously', pretendToBeVisual: true });
 const w = dom.window;
+w.settingsFixture.kongming_status = { enabled: true, theme: 'auto', deep: false, selectors: '', excluded: '' };
 for (const key of ['document', 'MutationObserver', 'SillyTavern']) globalThis[key] = w[key];
 globalThis.getComputedStyle = w.getComputedStyle.bind(w);
 globalThis.requestAnimationFrame = w.requestAnimationFrame.bind(w);
@@ -16,7 +17,7 @@ const style = w.document.createElement('style'); style.textContent = css; w.docu
 const plugin = await import('../index.js');
 const { findStatusRoots } = await import('../core.js');
 const settle = () => new Promise(resolve => setTimeout(resolve, 60));
-await settle();
+for (let attempt = 0; attempt < 30 && !w.document.querySelector('#chat .kms-card'); attempt++) await settle();
 const $ = selector => w.document.querySelector(selector);
 const has = id => $('#' + id)?.classList.contains('kms-card') || false;
 const originalChat = JSON.stringify(w.chatFixture);
@@ -27,9 +28,65 @@ async function setting(key, value) {
 }
 function add(html) { const div=w.document.createElement('div');div.innerHTML=html;$('.mes_text').append(...div.childNodes); }
 
+test('DOM: renamed header, visible enabled badge and accessible switch agree on startup', () => {
+    assert.equal($('.kms-settings-title').textContent, '统一状态栏');
+    assert.equal($('.kms-enable-badge').textContent, '已启用');
+    assert.equal($('[data-kms-setting="enabled"]').getAttribute('role'), 'switch');
+    assert.equal($('[data-kms-setting="enabled"]').checked, true);
+    assert.equal($('[data-kms-setting="enabled"]').getAttribute('aria-checked'), 'true');
+    assert.match($('.kms-count').textContent, /已启用/);
+    assert.equal($('#chat').getAttribute('data-kms-template'), 'classic');
+    $('#kongming-status-settings').open = false;
+    assert.equal($('#kongming-status-settings > summary .kms-enable-badge').textContent, '已启用');
+    $('#kongming-status-settings').open = true;
+});
 test('DOM: automatic status containers, details and tables; no nested double wrapping', () => {
     for (const id of ['named','fold','status-table','nested']) assert.equal(has(id),true,id);
     assert.equal($('#nested').querySelectorAll('.kms-card').length,0);
+});
+test('DOM: zero recognized cards is explicitly enabled, not mistaken for disabled', async () => {
+    await setting('excluded', 'status-bar, status, fold, status-table');
+    assert.equal(w.document.querySelectorAll('#chat .kms-card').length, 0);
+    assert.equal($('.kms-enable-badge').textContent, '已启用');
+    assert.match($('.kms-count').textContent, /已启用，当前未识别/);
+    await setting('excluded', '');
+});
+test('DOM: both new templates update cards and isolated preview with fixed dark/light modes', async () => {
+    const card = $('#named');
+    await setting('theme','dark');
+    for (const [template,mode] of [['slate','dark'],['paper','light']]) {
+        await setting('template',template);
+        assert.equal($('#chat').getAttribute('data-kms-template'),template);
+        assert.equal($('#chat').getAttribute('data-kms-mode'),mode);
+        assert.equal($('.kms-preview').getAttribute('data-kms-template'),template);
+        assert.equal($('.kms-preview').getAttribute('data-kms-mode'),mode);
+        assert.equal($('[data-kms-setting="theme"]').disabled,true);
+        assert.equal($('#named'),card);
+        assert.equal(w.settingsFixture.kongming_status.template,template);
+    }
+    assert.equal($('.kms-preview').closest('#chat'),null);
+    assert.equal($('#chat').textContent.includes('状态栏预览'),false);
+    assert.equal(JSON.stringify(w.chatFixture),originalChat);
+    await setting('template','classic');
+    assert.equal($('[data-kms-setting="theme"]').disabled,false);
+    assert.equal($('#chat').getAttribute('data-kms-mode'),'dark');
+    await setting('theme','auto');
+});
+test('DOM: off state remains unmistakable; preview is labelled as unapplied', async () => {
+    await setting('enabled',false);
+    assert.equal($('.kms-enable-badge').textContent,'已关闭');
+    assert.equal($('[data-kms-setting="enabled"]').checked,false);
+    assert.equal($('[data-kms-setting="enabled"]').getAttribute('aria-checked'),'false');
+    assert.equal($('.kms-switch-word').textContent,'关');
+    assert.match($('.kms-count').textContent,/已关闭/);
+    assert.match($('.kms-preview-note').textContent,/未应用到聊天/);
+    await setting('template','paper');
+    assert.equal(w.document.querySelectorAll('#chat .kms-card').length,0);
+    assert.equal($('.kms-preview').getAttribute('data-kms-template'),'paper');
+    await setting('enabled',true);
+    assert.equal($('.kms-enable-badge').textContent,'已启用');
+    assert.equal($('.kms-switch-word').textContent,'开');
+    await setting('template','classic');
 });
 test('DOM: prose, code, ordinary details, user message, unknown panel, iframe untouched', () => {
     for (const id of ['ordinary','code','ordinary-details','user-card','unusual','external-frame']) assert.equal(has(id),false,id);
@@ -105,6 +162,15 @@ test('DOM: hidden roots and hidden descendants are never made visible', async ()
 test('DOM: explicit ignore descendants prevent parent/deep recolor', async () => {
     add('<div class="status" id="ignore-parent"><section data-kms-ignore><h2>原设计</h2></section></div>');await setting('deep',true);
     assert.equal(has('ignore-parent'),false);await setting('deep',false);
+});
+test('DOM: new templates keep exclusions, body and hidden protections intact', async () => {
+    await setting('excluded','status-bar');
+    for (const template of ['slate','paper']) {
+        await setting('template',template);
+        for(const id of ['named','protected-body','protected-context','raw-inside','hidden-root','hidden-parent','aria-root','ignore-parent'])assert.equal(has(id),false,id);
+        assert.equal(w.getComputedStyle($('#hidden-table')).display,'none');
+    }
+    await setting('template','classic');await setting('excluded','');
 });
 test('DOM: streamed new nodes and edit/swipe replacement', async () => {
     add('<div class="custom-state_bar" id="stream">新的状态</div>');await settle();assert.equal(has('stream'),true);

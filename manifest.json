@@ -1,7 +1,7 @@
 {
-  "display_name": "空明 · 状态栏统一美化",
+  "display_name": "统一状态栏",
   "author": "hrholic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "loading_order": 100,
   "requires": [],
   "optional": [],
