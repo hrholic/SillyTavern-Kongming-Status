@@ -1,7 +1,9 @@
-import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js?v=0.2.1';
+import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.0';
+import { planTailStatuses } from './tail.js?v=0.3.0';
+import { createFrameController } from './frames.js?v=0.3.0';
 
 const KEY = 'kongming_status';
-const VERSION = '0.2.1';
+const VERSION = '0.3.0';
 let context;
 let settings = { ...DEFAULTS };
 let started = false;
@@ -16,6 +18,7 @@ let readyListener;
 let bootObserver;
 let bootNotice;
 let bootAttempts = 0;
+let frameController;
 const dirty = new Set();
 const decorated = new Set();
 const protectedCounts = new Map();
@@ -87,20 +90,53 @@ function eligible(message) {
 function unstyle(node) {
     node.classList.remove('kms-card', 'kms-deep');
     node.removeAttribute('data-kms-reason');
-    for (const marker of node.querySelectorAll(':scope > [data-kms-marker]')) {
+    for (const marker of node.querySelectorAll('[data-kms-marker]')) {
         if (!ownedMarkers.has(marker)) continue;
         marker.replaceWith(document.createTextNode(marker.textContent));
     }
     decorated.delete(node);
+    if (ownedWrappers.has(node)) node.replaceWith(...node.childNodes);
 }
 
-function scan(message) {
+function rawMessageFor(message) {
     const idText = message.closest('.mes')?.getAttribute('mesid');
     const id = /^\d+$/.test(idText ?? '') ? Number(idText) : -1;
     const current = getContextSafely() ?? context;
-    const raw = Number.isInteger(id) && id >= 0 ? current?.chat?.[id]?.mes : undefined;
+    return Number.isInteger(id) && id >= 0 ? current?.chat?.[id]?.mes : undefined;
+}
+
+function hideSourceMarkers(root, tag) {
+    if ([...root.querySelectorAll('[data-kms-marker]')].some(node=>ownedMarkers.has(node))) return;
+    const walker=document.createTreeWalker(root,4),texts=[];
+    let text;while((text=walker.nextNode()))if(text.nodeValue.trim())texts.push(text);
+    if(!texts.length)return;
+    const escaped=tag.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const first=texts[0],last=texts.at(-1);
+    const open=first.nodeValue.match(new RegExp(`^\\s*<${escaped}>`,'i'));
+    const close=last.nodeValue.match(new RegExp(`</${escaped}>\\s*$`,'i'));
+    if(!open||!close)return;
+    function marker(value){const node=element('span','',value);node.hidden=true;node.setAttribute('data-kms-marker','');ownedMarkers.add(node);return node;}
+    if(first===last)first.replaceWith(marker(open[0]),document.createTextNode(first.nodeValue.slice(open[0].length,-close[0].length)),marker(close[0]));
+    else {
+        first.replaceWith(marker(open[0]),document.createTextNode(first.nodeValue.slice(open[0].length)));
+        last.replaceWith(document.createTextNode(last.nodeValue.slice(0,-close[0].length)),marker(close[0]));
+    }
+}
+
+function scan(message) {
+    const raw = rawMessageFor(message);
+    const plan=settings.enabled&&eligible(message)?planTailStatuses(message,raw,settings.excluded):{existing:new Map(),groups:[]};
+    const additional=new Map(),sourceTags=new Map(),created=[];
+    for(const [node,item] of plan.existing){additional.set(node,item.reason);sourceTags.set(node,item.tag);}
+    for(const group of plan.groups){
+        if(!group.nodes.length||!group.nodes.every(node=>node.parentNode===message))continue;
+        const wrapper=element('section');wrapper.setAttribute('data-kms-tail-wrapper','');ownedWrappers.add(wrapper);
+        group.nodes[0].before(wrapper);wrapper.append(...group.nodes);created.push(wrapper);
+        additional.set(wrapper,group.reason);sourceTags.set(wrapper,group.tag);
+    }
     const { roots, protectedCount = 0 } = settings.enabled && eligible(message)
-        ? findStatusRoots(message, settings.selectors, settings.excluded, raw) : { roots: new Map() };
+        ? findStatusRoots(message, settings.selectors, settings.excluded, raw, additional) : { roots: new Map() };
+    for(const wrapper of created)if(!roots.has(wrapper))wrapper.replaceWith(...wrapper.childNodes);
     protectedCounts.set(message, protectedCount);
     for (const node of decorated) {
         if (!node.isConnected || (message.contains(node) && !roots.has(node))) unstyle(node);
@@ -109,6 +145,7 @@ function scan(message) {
         node.classList.add('kms-card');
         node.classList.toggle('kms-deep', settings.deep);
         node.setAttribute('data-kms-reason', reason);
+        if(sourceTags.has(node))hideSourceMarkers(node,sourceTags.get(node));
         if (reason === '可见标签' && !node.querySelector('[data-kms-marker]')) {
             const literal = literalStatus(node);
             if (literal) {
@@ -165,15 +202,16 @@ function refreshControls() {
     if (description) description.textContent = template.description;
     const previewNote = settingsPanel.querySelector('.kms-preview-note');
     if (previewNote) previewNote.textContent = settings.enabled
-        ? '样式预览 · 示例内容，不属于聊天记录'
+        ? (settings.template==='classic' ? '空明章节排版示例 · 实际内容与结构由原状态栏决定' : '样式预览 · 示例内容，不属于聊天记录')
         : '样式预览 · 已关闭，以下样式未应用到聊天';
+    for(const node of settingsPanel.querySelectorAll('[data-kms-demo]')) node.hidden = node.dataset.kmsDemo !== (settings.template==='classic'?'classic':'generic');
     applyTheme();
 }
 
 function refreshCount() {
     const output = settingsPanel?.querySelector('.kms-count');
     if (!output) return;
-    const count = [...decorated].filter(node => node.isConnected).length;
+    const count = [...decorated].filter(node => node.isConnected).length+(frameController?.count()||0);
     const skipped = [...protectedCounts].filter(([node]) => node.isConnected).reduce((sum, [, n]) => sum + n, 0);
     const text = settings.enabled
         ? `${count ? `已启用，当前已美化 ${count} 个状态栏。` : '已启用，当前未识别到可美化的状态栏。'}${skipped ? `正文保护 / 排除名单保留了 ${skipped} 个候选容器。` : ''}`
@@ -191,6 +229,7 @@ function flush() {
     } else {
         dirty.forEach(message => { if (message.isConnected) scan(message); });
     }
+    frameController?.sync([...document.querySelectorAll('#chat .mes .mes_text')].filter(eligible));
     fullScan = false;
     dirty.clear();
     refreshCount();
@@ -248,12 +287,23 @@ function buildSettings() {
     const preview = element('div', 'kms-preview');
     preview.setAttribute('aria-label', '当前模板的静态样式预览');
     const previewCard = element('section', 'kms-card');
+    previewCard.dataset.kmsDemo='generic';
     previewCard.append(element('h4', '', '状态栏预览'));
     const previewFields = element('dl');
     for (const [key, value] of [['地点', '窗边'], ['心情', '平静'], ['体力', '80 / 100']]) {
         previewFields.append(element('dt', '', key), element('dd', '', value));
     }
     previewCard.append(previewFields); preview.append(previewCard);
+    const classic = element('section','kms-card kms-classic-demo'); classic.dataset.kmsDemo='classic';
+    const strip=element('header','kms-classic-strip');
+    strip.append(element('span','kms-classic-label','CHAPTER'),element('span','','开篇示例'),element('span','kms-classic-location','AT 窗边 · WX 晴'));
+    const body=element('div','kms-classic-body');
+    body.append(element('p','kms-classic-number','CHAPTER 01'),element('h4','kms-classic-title','午后的空白页'),element('p','kms-classic-subtitle','An Unwritten Afternoon'));
+    const facts=element('p','kms-classic-facts');facts.append(element('span','kms-classic-key','STATE'),document.createTextNode(' 平静 · 体力 80 / 100'));
+    const tags=element('div','kms-classic-tags');tags.append(element('span','kms-classic-tag','#日常'),element('span','kms-classic-tag','#晴朗'));
+    const epigraph=element('div','kms-classic-epigraph'),quote=element('p','kms-classic-quote');
+    quote.append(element('span','kms-classic-initial','风'),document.createTextNode('轻轻翻过一页，午后仍有留白。'));
+    epigraph.append(element('p','kms-classic-caption','A QUIET MOMENT'),quote);body.append(facts,tags,epigraph);classic.append(strip,body);preview.append(classic);
     content.append(preview, element('p', 'kms-preview-note'));
 
     function checkbox(title, key) {
@@ -291,7 +341,7 @@ function buildSettings() {
     excludeInput.addEventListener('change', () => { settings.excluded = excludeInput.value.trim(); save(); });
     excluded.append(excludeInput); content.append(excluded);
     content.append(element('p', 'kms-help', '排除容器及后代保留原设计；为避免父级样式影响，也不美化包住它的状态栏。content / context 始终保护；原始标签已被剥掉时，只处理能够对应到保护区外的状态栏。'));
-    content.append(element('p', 'kms-help', '自动装饰已有状态容器、状态折叠栏和带标题的状态表格。完整、独立的纯文本状态标签只隐藏包裹标记。不会改写聊天记录；代码块、普通正文、隐藏内容和 iframe 内页保持原样。'));
+    content.append(element('p', 'kms-help', '自动识别已有状态容器，以及正文结束后完整标签中的字段式状态栏；只对应已经显示的内容，不从原文取出隐藏信息。支持可读取的酒馆助手消息内状态页，跨域页面与后台脚本页保持原样。'));
     const actions = element('div', 'kms-actions');
     const rescan = element('button', 'menu_button', '重新识别'); rescan.type = 'button';
     rescan.addEventListener('click', () => schedule(true));
@@ -330,6 +380,7 @@ function start() {
     }
     context = availableContext;
     settings = normalizeSettings(context?.extensionSettings?.[KEY]);
+    frameController=createFrameController({getSettings:()=>settings,getMode:mode,getRawMessage:rawMessageFor,onChange:refreshCount});
     buildSettings();
     observer = new MutationObserver(onMutations);
     observer.observe(document.body, {
@@ -356,6 +407,7 @@ function start() {
 
 // Also useful for extension development and a clean shutdown before reload.
 export function stop() {
+    frameController?.stop();frameController=null;
     clearTimeout(readyTimer); readyTimer = 0;
     bootObserver?.disconnect(); bootObserver = null;
     bootNotice?.remove(); bootNotice = null;

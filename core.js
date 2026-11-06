@@ -8,13 +8,15 @@ export const DEFAULTS = Object.freeze({
     excluded: '',
 });
 export const TEMPLATES = Object.freeze({
-    classic: { label: '原有 · 空明', description: '柔和圆角，保留原来的日夜配色。', mode: null },
+    classic: { label: '原有 · 空明', description: '透明底、渐隐细线与左对齐书卷排版，保留日夜配色。', mode: null },
     slate: { label: '墨夜 · 暗色', description: '炭黑底、细侧线与紧凑标题。', mode: 'dark' },
     paper: { label: '白纸 · 亮色', description: '纯白底、细顶线与清爽留白。', mode: 'light' },
 });
 // Only nodes created by this module's renderer can be treated as hidden markers.
 export const ownedMarkers = new WeakSet();
+export const ownedWrappers = new WeakSet();
 
+export const PROTECTED_TAGS = 'think thinking thought thoughts analysis reasoning preprint ecot cot scratchpad scratch_pad chain_of_thought chain-of-thought internal internal_thought internal_thoughts internal_reasoning hidden_thought hidden_thoughts thinking_process reasoning_process system system_prompt instructions instruction control tool tool_call tool_calls function_call'.split(' ');
 const TAGS = new Set(['status', 'statusbar', 'status_bar', 'status-panel',
     'status_panel', 'character_status', 'char_status', 'charstatus', 'stats',
     'state_bar', 'state-bar', 'top_blueprint', '状态栏', '状态面板', '角色状态']);
@@ -50,7 +52,7 @@ function blocked(node, root) {
     const view = root.ownerDocument.defaultView;
     for (let parent = node; parent && root.contains(parent); parent = parent.parentElement) {
         const style = view?.getComputedStyle(parent);
-        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse')) return true;
+        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.opacity === '0')) return true;
     }
     return false;
 }
@@ -59,7 +61,7 @@ function hiddenSelf(node) {
     if (ownedMarkers.has(node)) return false;
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     return node.hasAttribute('hidden') || node.getAttribute('aria-hidden') === 'true'
-        || style?.display === 'none' || style?.visibility === 'hidden' || style?.visibility === 'collapse';
+        || style?.display === 'none' || style?.visibility === 'hidden' || style?.visibility === 'collapse' || style?.opacity === '0';
 }
 
 /** Strict fallback for visible escaped tags, never for HTML/hidden descendants. */
@@ -74,7 +76,7 @@ export function literalStatus(node) {
 }
 
 export function excludedNames(text = '') {
-    return new Set(['content', 'context', ...String(text).split(/[,，;；\s]+/)
+    return new Set(['content', 'context', ...PROTECTED_TAGS, ...String(text).split(/[,，;；\s]+/)
         .map(value => value.replace(/^[<\/.#]+|[>]+$/g, '').toLowerCase())
         .filter(value => /^[\p{L}\p{N}_:.-]+$/u.test(value))]);
 }
@@ -85,6 +87,28 @@ function hasProtectedIdentity(node, names, explicitNames) {
         node.getAttribute('data-type') || '', node.getAttribute('data-role') || ''];
     return tokens.some(token => explicitNames.has(token.toLowerCase())
         || (token.startsWith('custom-') && explicitNames.has(token.slice(7).toLowerCase())));
+}
+
+/** Shared display-safety gate for source-mapped tail blocks. No raw text is rendered. */
+export function isSafeStatusNode(root, node, exclusionText = '') {
+    if (node.nodeType === 3) {
+        const parent = node.parentElement;
+        if (!parent || !root.contains(node) || parent.closest(SKIP)) return false;
+        if (parent !== root) return isSafeStatusNode(root, parent, exclusionText);
+        const style = root.ownerDocument.defaultView?.getComputedStyle(root);
+        return !style || (style.display !== 'none' && !['hidden','collapse'].includes(style.visibility) && style.opacity !== '0');
+    }
+    if (node.nodeType !== 1 || blocked(node, root)) return false;
+    const names = excludedNames(exclusionText);
+    const explicitNames = new Set(names);
+    if (!/(?:^|[,，;；\s])(?:[<\/.#]*)content(?:>|[,，;；\s]|$)/i.test(exclusionText)) explicitNames.delete('content');
+    if (!/(?:^|[,，;；\s])(?:[<\/.#]*)context(?:>|[,，;；\s]|$)/i.test(exclusionText)) explicitNames.delete('context');
+    for (let parent = node; parent && root.contains(parent); parent = parent.parentElement) {
+        if (parent.hasAttribute('data-kms-ignore') || hasProtectedIdentity(parent, names, explicitNames)) return false;
+    }
+    if (node.querySelector('pre,code,script,style,textarea,input,iframe,svg,canvas')) return false;
+    return ![...node.querySelectorAll('*')].some(child =>
+        child.hasAttribute('data-kms-ignore') || hasProtectedIdentity(child, names, explicitNames) || hiddenSelf(child));
 }
 
 export function comparableText(value) {
@@ -168,7 +192,7 @@ function automaticReason(node) {
 }
 
 /** Returns only existing DOM elements. Never interprets text as HTML. */
-export function findStatusRoots(root, customSelectors = '', exclusionText = '', rawMessage) {
+export function findStatusRoots(root, customSelectors = '', exclusionText = '', rawMessage, additional = new Map()) {
     const found = new Map();
     const names = excludedNames(exclusionText);
     const explicitNames = excludedNames(exclusionText);
@@ -180,7 +204,8 @@ export function findStatusRoots(root, customSelectors = '', exclusionText = '', 
     const hiddenNodes = all.filter(hiddenSelf);
     let protectedCount = 0;
     function allowed(node) {
-        if (names.has(literalStatus(node)?.tag)
+        if (node.querySelector('pre,code,script,style,textarea,input,iframe,svg,canvas')
+            || names.has(literalStatus(node)?.tag)
             || protectedNodes.some(protectedNode => protectedNode.contains(node) || node.contains(protectedNode))
             || hiddenNodes.some(hiddenNode => node.contains(hiddenNode))
             || !sourceAllows(node.textContent, sourceProtection)) {
@@ -203,6 +228,9 @@ export function findStatusRoots(root, customSelectors = '', exclusionText = '', 
                 }
             }
         } catch { selectorError = '选择器格式不正确；自动识别仍然有效。'; }
+    }
+    for (const [node, reason] of additional) {
+        if (!blocked(node, root) && allowed(node)) found.set(node, reason);
     }
     // One outer card, not a card for every nested status row/value.
     for (const node of found.keys()) {

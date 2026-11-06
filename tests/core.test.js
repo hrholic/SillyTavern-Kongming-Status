@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isStatusLabel, normalizeSettings, TEMPLATES, textColorMeansDark, excludedNames,
-    protectedSource, sourceAllows, comparableText } from '../core.js';
+    protectedSource, sourceAllows, comparableText, PROTECTED_TAGS } from '../core.js';
 
 test('recognizes exact short status headings, including decorated labels', () => {
     for (const value of ['状态栏', '🧭 角色状态', 'Status Panel', '当前状态', '顾舟的状态栏', '人物信息']) {
@@ -58,7 +58,7 @@ test('day/night derived from text luminance, with unknown-color fallback', () =>
 });
 test('exclude names are exact and accept tag/class/id notation', () => {
     assert.deepEqual([...excludedNames('<My-Status>, .keep #special\n状态栏')],
-        ['content', 'context', 'my-status', 'keep', 'special', '状态栏']);
+        ['content', 'context', ...PROTECTED_TAGS, 'my-status', 'keep', 'special', '状态栏']);
 });
 test('raw content/context protection allows an identifiable outside panel', () => {
     const p = protectedSource('<content><div class="status">正文状态:不应改</div></content><details><summary>状态栏</summary>HP:80</details>', excludedNames());

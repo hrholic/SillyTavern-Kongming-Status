@@ -58,10 +58,10 @@ try {
         await page.click('#original-action'); assert.equal(await page.evaluate(() => window.actionCount), 1);
         await page.click('#fold summary'); assert.equal(await page.locator('#fold').evaluate(node => node.open), true);
     });
-    await check('exact Kongming day/night palette', async () => {
-        assert.equal(await page.locator('#named').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(244, 241, 236)');
+    await check('classic keeps transparent editorial shell in both modes', async () => {
+        assert.equal(await page.locator('#named').evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
         await setting('theme', 'dark');
-        assert.equal(await page.locator('#named').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(23, 25, 29)');
+        assert.equal(await page.locator('#named').evaluate(node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
         await setting('theme', 'auto');
     });
     await check('fixed dark/light templates have different surfaces and visible geometry', async () => {

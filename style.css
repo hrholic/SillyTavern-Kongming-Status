@@ -187,3 +187,168 @@
     .kms-settings .kms-enable-control { padding: 10px; }
     .kms-settings .kms-enable-copy small { font-size: 0.75em; }
 }
+
+/* Independent editorial interpretation of the referenced Kongming design.
+ * Integrated after base styles. No source preset CSS, scripts, fonts or assets bundled.
+ * Rich chapter styling is restricted to our own illustrative preview markup.
+ */
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] {
+    --kms-radius: 0px;
+    --kms-inner-radius: 0px;
+    --kms-surface: transparent;
+    --kms-shadow: none;
+    --kms-pad-x: 16px;
+    --kms-pad-y: 18px;
+    --kms-classic-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", SimSun, serif;
+    --kms-classic-code: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    --kms-classic-rule: #14161a80;
+    --kms-classic-halo: #f4f1ec70;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"][data-kms-mode="dark"] {
+    --kms-classic-rule: #eceae66b;
+    --kms-classic-halo: #0b0c0e90;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-card {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+    background-image:
+        linear-gradient(to right, var(--kms-classic-rule), var(--kms-line) 45%, transparent),
+        linear-gradient(to right, var(--kms-line), transparent 80%) !important;
+    background-size: 100% 1px, 100% 1px !important;
+    background-position: left top, left bottom !important;
+    background-repeat: no-repeat !important;
+    text-align: start;
+    text-shadow: 0 0 12px var(--kms-classic-halo);
+    font-family: var(--kms-font);
+}
+/* Generic content keeps its existing structure; no labels or fields invented. */
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-card > :is(h1,h2,h3,h4,h5,h6) {
+    color: var(--kms-ink);
+    font-family: var(--kms-classic-serif);
+    font-weight: 500;
+    letter-spacing: .1em;
+    line-height: 1.45;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] details.kms-card > summary {
+    color: var(--kms-ink) !important;
+    font-weight: 500;
+    letter-spacing: .08em;
+    border-radius: 0;
+}
+/* The remaining rules affect only independently authored demo content. */
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-card.kms-classic-demo {
+    padding: 0 0 18px;
+    max-width: 680px;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo > .kms-classic-strip:not([hidden]) {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 5px;
+    padding: 12px 2px;
+    min-height: 60px;
+    box-sizing: border-box;
+    font: 500 13px/1.5 var(--kms-font);
+    letter-spacing: .08em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-label {
+    border: 1px solid var(--kms-classic-rule);
+    border-radius: 999px;
+    padding: 2px 9px;
+    color: var(--kms-muted);
+    font: 500 9px/1.4 var(--kms-font);
+    letter-spacing: .24em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-location {
+    grid-column: 2;
+    color: var(--kms-muted);
+    font: 400 12px/1.7 var(--kms-font);
+    letter-spacing: .02em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo > .kms-classic-body {
+    padding: 18px 16px 0;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-number:not([hidden]) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 10px;
+    color: var(--kms-muted);
+    font: 500 11px/1.4 var(--kms-classic-code);
+    letter-spacing: .14em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-number::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--kms-classic-rule), transparent);
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-title {
+    margin: 0;
+    color: var(--kms-ink);
+    font: 500 clamp(20px, 1.45rem, 26px)/1.4 var(--kms-classic-serif);
+    letter-spacing: .1em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-subtitle {
+    margin: 4px 0 0;
+    color: var(--kms-muted);
+    font: italic 400 12.5px/1.6 Georgia, var(--kms-classic-serif);
+    letter-spacing: .02em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-facts {
+    margin: 14px 0 0;
+    font: 400 13px/1.8 var(--kms-font);
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-key {
+    margin-inline-end: 8px;
+    color: var(--kms-muted);
+    font: 500 9px/1.8 var(--kms-font);
+    letter-spacing: .24em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-tags:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 0;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-tag {
+    border: 1px solid var(--kms-line);
+    border-radius: 999px;
+    padding-inline: 9px;
+    color: var(--kms-muted);
+    font: 400 11.5px/20px var(--kms-font);
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-epigraph {
+    margin: 18px 0 0;
+    padding-top: 24px;
+    background: linear-gradient(to right, transparent, var(--kms-line), transparent) left top / 100% 1px no-repeat;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-caption {
+    margin: 0 0 10px;
+    color: var(--kms-muted);
+    font: 500 9px/1.4 var(--kms-classic-code);
+    letter-spacing: .24em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-quote {
+    margin: 0;
+    color: var(--kms-ink);
+    font: 400 16px/1.9 var(--kms-classic-serif);
+    letter-spacing: .06em;
+}
+:is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-initial {
+    font-size: 2.4em;
+    line-height: 1;
+    vertical-align: -.1em;
+    margin-inline-end: .1em;
+}
+@media (max-width: 420px) {
+    :is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo > .kms-classic-body { padding-inline: 12px; }
+    :is(#chat, #kongming-status-settings .kms-preview, .kms-frame-surface)[data-kms-template="classic"] .kms-classic-demo .kms-classic-location { grid-column: 1 / -1; }
+}
+
+/* Respect preview switch and preserve line breaks in source-mapped text. */
+#kongming-status-settings .kms-preview [data-kms-demo][hidden] { display: none !important; }
+#chat .mes_text .kms-card[data-kms-tail-wrapper] { white-space: pre-wrap; }
