@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>空明状态栏兼容性测试</title><link rel="stylesheet" href="../style.css">
+<style>
+body{margin:0;background:#e9e5df;color:#26282c;font:15px/1.65 system-ui;--SmartThemeBodyColor:rgb(38,40,44)}
+main{max-width:740px;margin:24px auto;padding:0 16px}.mes{padding:8px 0}.mes_text{min-width:0}
+#extensions_settings{max-width:740px;margin:30px auto;padding:0 16px}button,input,select,textarea{font:inherit;max-width:100%;box-sizing:border-box}h1{font-size:21px}table{border-collapse:collapse}td,th{border:1px solid #999;padding:6px}code,pre{white-space:pre-wrap}.legend{font-size:13px;color:#666}
+</style></head><body>
+<main><h1>空明 · 状态栏统一美化</h1><p class="legend">独立测试页：状态容器、折叠栏和表格共用配色，正文保持原样。</p>
+<div id="chat">
+<div class="mes" is_user="false" mesid="0"><div class="mes_text">
+<p id="ordinary">他望着窗外的雨。时间：21:30，心情：平静。这是正文，不是状态栏。</p>
+<div id="named" class="custom-status-bar"><h3>角色状态</h3><dl><dt>地点</dt><dd>旧书店 · 靠窗座位</dd><dt>心情</dt><dd>平静，正在等你</dd></dl><button id="original-action">原有按钮</button></div>
+<details id="fold"><summary>🧭 状态栏</summary><p>体力：80 / 100</p><p>目标：等待雨停</p></details>
+<table id="status-table"><caption>人物属性</caption><tr><th>项目</th><th>数值</th></tr><tr><td>生命</td><td>80</td></tr><tr><td>地点</td><td>窗边</td></tr></table>
+<details id="ordinary-details"><summary>故事回顾</summary><p>普通折叠段落</p></details>
+<div id="nested" class="custom-status"><div class="custom-status-row">内嵌字段：保持一个外框</div></div>
+<pre id="code"><code>&lt;div class="status"&gt;示例&lt;/div&gt;</code></pre>
+<div id="unusual" class="bespoke-panel">特殊卡片：默认不猜测</div>
+<iframe id="external-frame" srcdoc="<div class='status'>独立 iframe 不注入</div>"></iframe>
+</div></div>
+<div class="mes" is_user="true" mesid="1"><div class="mes_text"><div class="status" id="user-card">用户消息保持原样</div></div>
+</div></main><div id="extensions_settings"></div>
+<script>
+window.actionCount=0;document.getElementById('original-action').addEventListener('click',()=>window.actionCount++);
+window.chatFixture=[{mes:'测试页：未使用正文标签。'}, {mes:'用户消息'}];
+const events=new Map();window.settingsFixture={};window.saved=0;
+window.SillyTavern={getContext:()=>({chat:window.chatFixture,extensionSettings:window.settingsFixture,saveSettingsDebounced:()=>window.saved++,eventTypes:{APP_READY:'ready',MESSAGE_UPDATED:'updated',CHAT_CHANGED:'changed',MESSAGE_SWIPED:'swiped'},eventSource:{on:(name,fn)=>{if(name==='ready'){queueMicrotask(fn);return;}if(!events.has(name))events.set(name,new Set());events.get(name).add(fn);},removeListener:(name,fn)=>events.get(name)?.delete(fn)}})};
+window.emitFixture=name=>events.get(name)?.forEach(fn=>fn());
+</script><script type="module" src="../index.js"></script>
+</body></html>

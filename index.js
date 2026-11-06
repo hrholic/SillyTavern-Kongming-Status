@@ -1,0 +1,256 @@
+import { DEFAULTS, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js';
+
+const KEY = 'kongming_status';
+let context;
+let settings = { ...DEFAULTS };
+let started = false;
+let observer;
+let themeObserver;
+let scheduled = 0;
+let fullScan = true;
+let settingsPanel;
+let disabledByHost = false;
+let readyTimer = 0;
+let readyListener;
+const dirty = new Set();
+const decorated = new Set();
+const protectedCounts = new Map();
+const listeners = [];
+
+function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+function messageFor(node) {
+    const el = node?.nodeType === 1 ? node : node?.parentElement;
+    const message = el?.closest?.('.mes_text');
+    return message && message.closest('#chat') ? message : null;
+}
+
+function eligible(message) {
+    const mes = message.closest('.mes');
+    return mes && mes.getAttribute('is_user') !== 'true'
+        && !mes.querySelector('.mes_edit_textarea');
+}
+
+function unstyle(node) {
+    node.classList.remove('kms-card', 'kms-deep');
+    node.removeAttribute('data-kms-reason');
+    for (const marker of node.querySelectorAll(':scope > [data-kms-marker]')) {
+        if (!ownedMarkers.has(marker)) continue;
+        marker.replaceWith(document.createTextNode(marker.textContent));
+    }
+    decorated.delete(node);
+}
+
+function scan(message) {
+    const idText = message.closest('.mes')?.getAttribute('mesid');
+    const id = /^\d+$/.test(idText ?? '') ? Number(idText) : -1;
+    const current = globalThis.SillyTavern?.getContext?.() ?? context;
+    const raw = Number.isInteger(id) && id >= 0 ? current?.chat?.[id]?.mes : undefined;
+    const { roots, protectedCount = 0 } = settings.enabled && eligible(message)
+        ? findStatusRoots(message, settings.selectors, settings.excluded, raw) : { roots: new Map() };
+    protectedCounts.set(message, protectedCount);
+    for (const node of decorated) {
+        if (!node.isConnected || (message.contains(node) && !roots.has(node))) unstyle(node);
+    }
+    for (const [node, reason] of roots) {
+        node.classList.add('kms-card');
+        node.classList.toggle('kms-deep', settings.deep);
+        node.setAttribute('data-kms-reason', reason);
+        if (reason === '可见标签' && !node.querySelector('[data-kms-marker]')) {
+            const literal = literalStatus(node);
+            if (literal) {
+                const open = element('span', '', literal.opening);
+                const close = element('span', '', literal.closing);
+                open.hidden = close.hidden = true;
+                open.setAttribute('data-kms-marker', ''); close.setAttribute('data-kms-marker', '');
+                ownedMarkers.add(open); ownedMarkers.add(close);
+                node.replaceChildren(open, document.createTextNode(literal.body), close);
+            }
+        }
+        decorated.add(node);
+    }
+}
+
+function mode() {
+    if (settings.theme !== 'auto') return settings.theme;
+    const style = getComputedStyle(document.body);
+    const smart = style.getPropertyValue('--SmartThemeBodyColor').trim();
+    const dark = textColorMeansDark(smart) ?? textColorMeansDark(style.color);
+    return (dark ?? matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+function applyTheme() {
+    const chat = document.getElementById('chat');
+    if (chat) chat.setAttribute('data-kms-mode', mode());
+}
+
+function refreshCount() {
+    const output = settingsPanel?.querySelector('.kms-count');
+    if (!output) return;
+    const count = [...decorated].filter(node => node.isConnected).length;
+    const skipped = [...protectedCounts].filter(([node]) => node.isConnected).reduce((sum, [, n]) => sum + n, 0);
+    output.textContent = settings.enabled
+        ? `当前已美化 ${count} 个状态栏。${skipped ? `正文保护 / 排除名单保留了 ${skipped} 个候选容器。` : ''}`
+        : '已关闭，原有显示已恢复。';
+}
+
+function flush() {
+    scheduled = 0;
+    applyTheme();
+    if (fullScan) {
+        for (const node of decorated) if (!node.isConnected) unstyle(node);
+        for (const node of protectedCounts.keys()) if (!node.isConnected) protectedCounts.delete(node);
+        document.querySelectorAll('#chat .mes .mes_text').forEach(scan);
+    } else {
+        dirty.forEach(message => { if (message.isConnected) scan(message); });
+    }
+    fullScan = false;
+    dirty.clear();
+    refreshCount();
+}
+
+function schedule(all = false) {
+    fullScan ||= all;
+    if (!scheduled) scheduled = requestAnimationFrame(flush);
+}
+
+function save() {
+    if (context?.extensionSettings) {
+        context.extensionSettings[KEY] = { ...settings };
+        context.saveSettingsDebounced?.();
+    }
+    schedule(true);
+}
+
+function buildSettings() {
+    const target = document.getElementById('extensions_settings')
+        || document.getElementById('extensions_settings2');
+    if (!target || settingsPanel?.isConnected) return;
+    settingsPanel = element('details', 'kms-settings');
+    settingsPanel.id = 'kongming-status-settings';
+    settingsPanel.append(element('summary', '', '空明 · 状态栏统一美化'));
+    const content = element('div', 'kms-settings-body');
+
+    function checkbox(title, key) {
+        const label = element('label', 'checkbox_label');
+        const input = element('input'); input.type = 'checkbox'; input.checked = settings[key];
+        input.dataset.kmsSetting = key;
+        input.addEventListener('change', () => { settings[key] = input.checked; save(); });
+        label.append(input, element('span', '', title)); content.append(label);
+    }
+    checkbox('启用（仅助手消息）', 'enabled');
+    const label = element('label', 'kms-field', '配色');
+    const select = element('select', 'text_pole'); select.dataset.kmsSetting = 'theme';
+    for (const [value, text] of [['auto', '跟随酒馆'], ['light', '空明 · 日间'], ['dark', '空明 · 夜间']]) {
+        const option = element('option', '', text); option.value = value; select.append(option);
+    }
+    select.value = settings.theme;
+    select.addEventListener('change', () => { settings.theme = select.value; save(); });
+    label.append(select); content.append(label);
+    checkbox('深入配色（覆盖内部文字与底色，可能改变原栏配色）', 'deep');
+    const custom = element('label', 'kms-field', '额外状态栏选择器（选填）');
+    const input = element('input', 'text_pole'); input.type = 'text'; input.maxLength = 1000;
+    input.placeholder = '.my-status, #character-panel'; input.value = settings.selectors;
+    input.dataset.kmsSetting = 'selectors';
+    const error = element('div', 'kms-error'); error.setAttribute('role', 'status');
+    input.addEventListener('change', () => {
+        settings.selectors = input.value.trim();
+        try { document.createElement('div').querySelectorAll(settings.selectors || ':not(*)'); error.textContent = ''; }
+        catch { error.textContent = '选择器格式不正确；自动识别仍然有效。'; }
+        save();
+    });
+    custom.append(input); content.append(custom, error);
+    const excluded = element('label', 'kms-field', '不识别名单（标签名 / 类名 / ID，逗号或换行分隔）');
+    const excludeInput = element('textarea', 'text_pole');
+    excludeInput.rows = 3; excludeInput.maxLength = 2000; excludeInput.value = settings.excluded;
+    excludeInput.placeholder = 'my-status, special-panel'; excludeInput.dataset.kmsSetting = 'excluded';
+    excludeInput.addEventListener('change', () => { settings.excluded = excludeInput.value.trim(); save(); });
+    excluded.append(excludeInput); content.append(excluded);
+    content.append(element('p', 'kms-help', '排除容器及后代保留原设计；为避免父级样式影响，也不美化包住它的状态栏。content / context 始终保护；原始标签已被剥掉时，只处理能够对应到保护区外的状态栏。'));
+    content.append(element('p', 'kms-help', '自动装饰已有状态容器、状态折叠栏和带标题的状态表格。完整、独立的纯文本状态标签只隐藏包裹标记。不会改写聊天记录；代码块、普通正文、隐藏内容和 iframe 内页保持原样。'));
+    const actions = element('div', 'kms-actions');
+    const rescan = element('button', 'menu_button', '重新识别'); rescan.type = 'button';
+    rescan.addEventListener('click', () => schedule(true));
+    actions.append(rescan, element('span', 'kms-count'));
+    content.append(actions); settingsPanel.append(content); target.append(settingsPanel);
+}
+
+function onMutations(records) {
+    for (const record of records) {
+        if (record.type === 'attributes' && record.attributeName === 'class') {
+            const clean = value => String(value || '').split(/\s+/).filter(name => name && !['kms-card', 'kms-deep'].includes(name)).sort().join(' ');
+            if (clean(record.oldValue) === clean(record.target.getAttribute('class'))) continue;
+        }
+        const message = messageFor(record.target);
+        if (message) { dirty.add(message); continue; }
+        if (record.type !== 'childList') continue;
+        for (const node of [...record.addedNodes, ...record.removedNodes]) {
+            if (node.nodeType !== 1) continue;
+            if (node.matches('#chat,.mes,.mes_text') || node.querySelector('#chat,.mes,.mes_text')) fullScan = true;
+        }
+    }
+    if (fullScan || dirty.size) schedule();
+    if (!settingsPanel?.isConnected) buildSettings();
+}
+
+function start() {
+    if (disabledByHost || started || !document.body) return;
+    started = true;
+    context = globalThis.SillyTavern?.getContext?.();
+    settings = normalizeSettings(context?.extensionSettings?.[KEY]);
+    buildSettings();
+    observer = new MutationObserver(onMutations);
+    observer.observe(document.body, {
+        childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true,
+        attributeFilter: ['class', 'id', 'style', 'hidden', 'aria-hidden', 'data-type', 'data-role', 'data-status', 'data-status-bar', 'data-kms-ignore'],
+    });
+    themeObserver = new MutationObserver(() => schedule());
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+    const events = context?.eventTypes ?? context?.event_types;
+    for (const name of ['CHARACTER_MESSAGE_RENDERED', 'USER_MESSAGE_RENDERED', 'MESSAGE_UPDATED',
+        'MESSAGE_SWIPED', 'CHAT_CHANGED', 'MORE_MESSAGES_LOADED', 'MESSAGE_DELETED']) {
+        if (!events?.[name] || !context?.eventSource?.on) continue;
+        const handler = () => schedule(true);
+        context.eventSource.on(events[name], handler);
+        listeners.push([events[name], handler]);
+    }
+    schedule(true);
+}
+
+// Also useful for extension development and a clean shutdown before reload.
+export function stop() {
+    observer?.disconnect(); themeObserver?.disconnect();
+    if (scheduled) cancelAnimationFrame(scheduled);
+    scheduled = 0;
+    for (const [name, handler] of listeners) context?.eventSource?.removeListener?.(name, handler);
+    listeners.length = 0;
+    for (const node of [...decorated]) unstyle(node);
+    document.getElementById('chat')?.removeAttribute('data-kms-mode');
+    settingsPanel?.remove(); settingsPanel = null;
+    dirty.clear(); fullScan = true; started = false;
+    protectedCounts.clear();
+}
+
+export function onDisable() {
+    disabledByHost = true;
+    clearTimeout(readyTimer);
+    if (readyListener) initialContext?.eventSource?.removeListener?.(ready, readyListener);
+    stop();
+}
+
+const initialContext = globalThis.SillyTavern?.getContext?.();
+const ready = (initialContext?.eventTypes ?? initialContext?.event_types)?.APP_READY;
+if (ready && initialContext?.eventSource?.on) {
+    readyListener = () => { readyTimer = setTimeout(start, 0); };
+    initialContext.eventSource.on(ready, readyListener);
+} else if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+} else {
+    start();
+}

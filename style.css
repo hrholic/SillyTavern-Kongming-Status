@@ -1,0 +1,101 @@
+/* Original, scoped CSS. The Kongming palette is credited in README.md. */
+#chat {
+    --kms-ink: #14161a;
+    --kms-muted: #14161ab8;
+    --kms-line: #14161a24;
+    --kms-accent: #36526a;
+    --kms-soft: #36526a14;
+    --kms-surface: #f4f1ec;
+    --kms-shadow: 0 8px 24px #14161a0d;
+    --kms-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+#chat[data-kms-mode="dark"] {
+    --kms-ink: #eceae6;
+    --kms-muted: #eceae6b8;
+    --kms-line: #eceae624;
+    --kms-accent: #a7bfd3;
+    --kms-soft: #a7bfd31a;
+    --kms-surface: #17191d;
+    --kms-shadow: 0 8px 24px #00000026;
+}
+#chat .mes_text .kms-card {
+    box-sizing: border-box;
+    color: var(--kms-ink) !important;
+    background-color: var(--kms-surface) !important;
+    border: 1px solid var(--kms-line) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--kms-shadow) !important;
+    font-family: var(--kms-font);
+    line-height: 1.7;
+    padding: 14px 16px;
+    margin-block: 12px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+#chat .mes_text .kms-card[data-kms-reason="可见标签"] { white-space: pre-wrap; }
+#chat .mes_text details.kms-card { padding: 0; }
+#chat .mes_text details.kms-card > summary {
+    cursor: pointer;
+    padding: 12px 16px;
+    font: 600 0.95em/1.6 var(--kms-font);
+    color: var(--kms-accent) !important;
+    background-color: transparent !important;
+    border-radius: 11px;
+}
+#chat .mes_text details.kms-card[open] { padding: 0 16px 14px; }
+#chat .mes_text details.kms-card[open] > summary {
+    margin-inline: -16px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--kms-line);
+    border-radius: 11px 11px 0 0;
+}
+#chat .mes_text .kms-card :is(h1,h2,h3,h4,h5,h6,legend,caption) {
+    color: var(--kms-accent);
+    font-family: var(--kms-font);
+    letter-spacing: 0.04em;
+}
+#chat .mes_text .kms-card :is(img,video) { max-width: 100%; height: auto; }
+#chat .mes_text table.kms-card {
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+    padding: 4px;
+}
+#chat .mes_text .kms-card table {
+    max-width: 100%;
+    overflow-x: auto;
+}
+#chat .mes_text .kms-card :is(th,td) {
+    border-color: var(--kms-line);
+    padding: 7px 10px;
+}
+#chat .mes_text .kms-card th { color: var(--kms-accent); background-color: var(--kms-soft); }
+#chat .mes_text .kms-card dt { color: var(--kms-muted); font-size: 0.85em; }
+#chat .mes_text .kms-card dd { margin-inline-start: 0; margin-bottom: 8px; }
+#chat .mes_text .kms-card a { color: var(--kms-accent); }
+/* Opt-in. Default mode deliberately preserves custom inner colors and layouts. */
+#chat .mes_text .kms-deep :is(div,section,article,p,span,table,tr,td,th,dl,dt,dd,li,label) {
+    color: var(--kms-ink) !important;
+    background-color: transparent !important;
+    border-color: var(--kms-line) !important;
+}
+#chat .mes_text .kms-deep :is(h1,h2,h3,h4,h5,h6,summary,legend,caption) { color: var(--kms-accent) !important; }
+.kms-settings { border: 1px solid var(--SmartThemeBorderColor, #8885); border-radius: 8px; margin-block: 8px; }
+.kms-settings > summary { padding: 10px; font-weight: 600; cursor: pointer; }
+.kms-settings-body { padding: 0 10px 12px; display: grid; gap: 10px; }
+.kms-settings .kms-field { display: grid; gap: 5px; }
+.kms-settings .kms-help { margin: 0; font-size: 0.85em; opacity: 0.8; }
+.kms-settings .kms-error { font-size: 0.85em; color: #d87970; }
+.kms-settings .kms-error:empty { display: none; }
+.kms-settings .kms-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.kms-settings .kms-count { font-size: 0.85em; }
+@media (max-width: 480px) {
+    #chat .mes_text .kms-card { padding: 11px 12px; border-radius: 10px !important; }
+    #chat .mes_text details.kms-card { padding: 0; }
+    #chat .mes_text details.kms-card[open] { padding: 0 12px 12px; }
+    #chat .mes_text details.kms-card > summary { padding: 11px 12px; }
+    #chat .mes_text details.kms-card[open] > summary { margin-inline: -12px; }
+}
