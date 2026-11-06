@@ -16,7 +16,7 @@ export const TEMPLATES = Object.freeze({
 export const ownedMarkers = new WeakSet();
 export const ownedWrappers = new WeakSet();
 
-export const PROTECTED_TAGS = 'think thinking thought thoughts analysis reasoning preprint ecot cot scratchpad scratch_pad chain_of_thought chain-of-thought internal internal_thought internal_thoughts internal_reasoning hidden_thought hidden_thoughts thinking_process reasoning_process system system_prompt instructions instruction control tool tool_call tool_calls function_call'.split(' ');
+export const PROTECTED_TAGS = 'xp_cot pre code script style textarea think thinking thought thoughts analysis reasoning preprint ecot cot scratchpad scratch_pad chain_of_thought chain-of-thought internal internal_thought internal_thoughts internal_reasoning hidden_thought hidden_thoughts thinking_process reasoning_process system system_prompt instructions instruction control tool tool_call tool_calls function_call'.split(' ');
 const TAGS = new Set(['status', 'statusbar', 'status_bar', 'status-panel',
     'status_panel', 'character_status', 'char_status', 'charstatus', 'stats',
     'state_bar', 'state-bar', 'top_blueprint', '状态栏', '状态面板', '角色状态']);
@@ -125,40 +125,39 @@ export function comparableText(value) {
 }
 
 /** Read-only mapping aid. Unclosed protection tags protect the remainder. */
+export function hiddenSourceTag(markup) {
+    return /\shidden(?:\s|=|\/?>)/i.test(markup)
+        || /\saria-hidden\s*=\s*["']?true\b/i.test(markup)
+        || /\sstyle\s*=\s*["'][^"']*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?:[;\s"']|$))/i.test(markup);
+}
 export function protectedSource(raw, names) {
     if (typeof raw !== 'string') return null;
-    // Code examples are not instructions to style or protect other content.
-    const source = raw.replace(/(`{3,}|~{3,})[^\n]*\n[\s\S]*?\1|`[^`\n]*`/g,
-        match => ' '.repeat(match.length));
-    const re = /<\/?([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s[^<>]*?)?\s*\/?>/gu;
-    const stack = [];
-    const intervals = [];
-    let begin = 0;
-    for (const match of source.matchAll(re)) {
-        const name = match[1].toLowerCase();
-        if (!names.has(name) || /\/\s*>$/.test(match[0])) continue;
-        if (!match[0].startsWith('</')) {
-            if (!stack.length) begin = match.index;
-            stack.push(name);
-        } else if (stack.length && stack.at(-1) === name) {
-            stack.pop();
-            if (!stack.length) intervals.push([begin, match.index + match[0].length]);
+    const source = raw.replace(/<!--[\s\S]*?-->/g, match=>' '.repeat(match.length))
+        .replace(/(`{3,}|~{3,})[^\n]*\n[\s\S]*?\1|`[^`\n]*`/g, match=>' '.repeat(match.length));
+    const re=/<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+(?:"[^"]*"|'[^']*'|[^'"<>])*)?\s*\/?>/gu;
+    const stack=[],intervals=[];let depth=0,begin=0;
+    const voids=new Set(['br','hr','img','input','meta','link','source','area','base','col','embed','param','track','wbr']);
+    for(const match of source.matchAll(re)) {
+        const name=match[2].toLowerCase();
+        if(voids.has(name)||/\/\s*>$/.test(match[0]))continue;
+        if(!match[1]) {
+            const protectedTag=names.has(name)||hiddenSourceTag(match[0])||/(?:^|[_:-])cot$/.test(name);
+            if(protectedTag && depth++===0)begin=match.index;
+            stack.push({name,protectedTag});
+        } else if(stack.at(-1)?.name===name) {
+            const last=stack.pop();
+            if(last.protectedTag && --depth===0)intervals.push([begin,match.index+match[0].length]);
         }
     }
-    if (stack.length) intervals.push([begin, source.length]);
-    if (!intervals.length) return null;
-    const outside = [], inside = [], rawOutside = [], rawInside = [];
-    let last = 0;
-    for (const [from, to] of intervals) {
-        rawOutside.push(source.slice(last, from));
-        outside.push(comparableText(source.slice(last, from)));
-        rawInside.push(source.slice(from, to));
-        inside.push(comparableText(source.slice(from, to)));
-        last = to;
+    if(depth)intervals.push([begin,source.length]);
+    if(!intervals.length)return null;
+    const outside=[],inside=[],rawOutside=[],rawInside=[];let last=0;
+    for(const [from,to] of intervals) {
+        rawOutside.push(source.slice(last,from));outside.push(comparableText(source.slice(last,from)));
+        rawInside.push(source.slice(from,to));inside.push(comparableText(source.slice(from,to)));last=to;
     }
-    rawOutside.push(source.slice(last));
-    outside.push(comparableText(source.slice(last)));
-    return { outside, inside, rawOutside, rawInside };
+    rawOutside.push(source.slice(last));outside.push(comparableText(source.slice(last)));
+    return {outside,inside,rawOutside,rawInside};
 }
 
 export function sourceAllows(text, protection) {

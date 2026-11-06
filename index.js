@@ -1,9 +1,12 @@
-import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.1';
-import { planTailStatuses } from './tail.js?v=0.3.1';
-import { createFrameController } from './frames.js?v=0.3.1';
+import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.2';
+import { planTailStatuses } from './tail.js?v=0.3.2';
+import { createFrameController } from './frames.js?v=0.3.2';
+
+import { findBlueprintRoots } from './blueprint.js?v=0.3.2';
+import { findRenderedPanelRoots } from './panels.js?v=0.3.2';
 
 const KEY = 'kongming_status';
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 let context;
 let settings = { ...DEFAULTS };
 let started = false;
@@ -21,6 +24,7 @@ let bootAttempts = 0;
 let frameController;
 const dirty = new Set();
 const decorated = new Set();
+const shellDecorated = new Set();
 const protectedCounts = new Map();
 const listeners = [];
 
@@ -125,6 +129,11 @@ function hideSourceMarkers(root, tag) {
 
 function scan(message) {
     const raw = rawMessageFor(message);
+    const shells=settings.enabled&&eligible(message)?new Map([
+        ...findRenderedPanelRoots(message,raw,settings.excluded),
+        ...findBlueprintRoots(message,raw,settings.excluded),
+    ]):new Map();
+    for(const node of shells.keys())for(let p=node.parentElement;p&&p!==message;p=p.parentElement)if(shells.has(p)){shells.delete(node);break;}
     const plan=settings.enabled&&eligible(message)?planTailStatuses(message,raw,settings.excluded):{existing:new Map(),groups:[]};
     const additional=new Map(),sourceTags=new Map(),created=[];
     for(const [node,item] of plan.existing){additional.set(node,item);sourceTags.set(node,item.tag);}
@@ -137,6 +146,11 @@ function scan(message) {
     }
     const { roots, protectedCount = 0 } = settings.enabled && eligible(message)
         ? findStatusRoots(message, settings.selectors, settings.excluded, raw, additional) : { roots: new Map() };
+    for(const node of roots.keys())if([...shells.keys()].some(shell=>shell.contains(node)||node.contains(shell)))roots.delete(node);
+    for(const node of shellDecorated)if(!node.isConnected||(message.contains(node)&&!shells.has(node))){
+        node.classList.remove('kms-shell');node.removeAttribute('data-kms-shell-reason');shellDecorated.delete(node);
+    }
+    for(const [node,evidence] of shells){node.classList.add('kms-shell');node.setAttribute('data-kms-shell-reason',evidence.reason);shellDecorated.add(node);}
     for(const wrapper of created)if(!roots.has(wrapper))wrapper.replaceWith(...wrapper.childNodes);
     protectedCounts.set(message, protectedCount);
     for (const node of decorated) {
@@ -212,7 +226,7 @@ function refreshControls() {
 function refreshCount() {
     const output = settingsPanel?.querySelector('.kms-count');
     if (!output) return;
-    const count = [...decorated].filter(node => node.isConnected).length+(frameController?.count()||0);
+    const count = [...decorated].filter(node => node.isConnected).length+[...shellDecorated].filter(node=>node.isConnected).length+(frameController?.count()||0);
     const skipped = [...protectedCounts].filter(([node]) => node.isConnected).reduce((sum, [, n]) => sum + n, 0);
     const text = settings.enabled
         ? `${count ? `已启用，当前已美化 ${count} 个状态栏。` : '已启用，当前未识别到可美化的状态栏。'}${skipped ? `正文保护 / 排除名单保留了 ${skipped} 个候选容器。` : ''}`
@@ -342,7 +356,7 @@ function buildSettings() {
     excludeInput.addEventListener('change', () => { settings.excluded = excludeInput.value.trim(); save(); });
     excluded.append(excludeInput); content.append(excluded);
     content.append(element('p', 'kms-help', '排除容器及后代保留原设计；为避免父级样式影响，也不美化包住它的状态栏。content / context 始终保护；原始标签已被剥掉时，只处理能够对应到保护区外的状态栏。'));
-    content.append(element('p', 'kms-help', '自动识别已有状态容器，以及正文结束后完整标签中的字段式状态栏；只对应已经显示的内容，不从原文取出隐藏信息。支持可读取的酒馆助手消息内状态页，跨域页面与后台脚本页保持原样。'));
+    content.append(element('p', 'kms-help', '自动识别已有状态容器，以及正文外完整标签对应的独立面板；只对应已经显示的内容，不从原文取出隐藏信息。支持可读取的酒馆助手消息内状态页，跨域页面与后台脚本页保持原样。'));
     const actions = element('div', 'kms-actions');
     const rescan = element('button', 'menu_button', '重新识别'); rescan.type = 'button';
     rescan.addEventListener('click', () => schedule(true));
@@ -356,7 +370,7 @@ function buildSettings() {
 function onMutations(records) {
     for (const record of records) {
         if (record.type === 'attributes' && record.attributeName === 'class') {
-            const clean = value => String(value || '').split(/\s+/).filter(name => name && !['kms-card', 'kms-deep'].includes(name)).sort().join(' ');
+            const clean = value => String(value || '').split(/\s+/).filter(name => name && !['kms-card', 'kms-deep', 'kms-shell'].includes(name)).sort().join(' ');
             if (clean(record.oldValue) === clean(record.target.getAttribute('class'))) continue;
         }
         const message = messageFor(record.target);
@@ -418,6 +432,7 @@ export function stop() {
     for (const [name, handler] of listeners) context?.eventSource?.removeListener?.(name, handler);
     listeners.length = 0;
     for (const node of [...decorated]) unstyle(node);
+    for(const node of shellDecorated){node.classList.remove('kms-shell');node.removeAttribute('data-kms-shell-reason');}shellDecorated.clear();
     document.getElementById('chat')?.removeAttribute('data-kms-mode');
     document.getElementById('chat')?.removeAttribute('data-kms-template');
     settingsPanel?.remove(); settingsPanel = null;

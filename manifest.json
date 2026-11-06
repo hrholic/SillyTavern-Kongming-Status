@@ -1,7 +1,7 @@
 {
   "display_name": "统一状态栏",
   "author": "hrholic",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "loading_order": 100,
   "requires": [],
   "optional": [],

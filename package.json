@@ -1,16 +1,16 @@
 {
   "name": "sillytavern-kongming-status",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/core.test.js tests/dom.test.js tests/boot.test.js tests/context-boot.test.js tests/frames.test.js tests/tail.test.js tests/tail-dom.test.js tests/expansion.test.js",
+    "test": "node --test tests/core.test.js tests/dom.test.js tests/boot.test.js tests/context-boot.test.js tests/frames.test.js tests/tail.test.js tests/tail-dom.test.js tests/expansion.test.js tests/blueprint.test.js tests/panels.test.js tests/panel-integration.test.js",
     "test:browser": "node tests/browser.test.js",
     "test:dom": "node --test tests/dom.test.js",
     "test:boot": "node --test tests/boot.test.js tests/context-boot.test.js",
     "test:tail": "node --test tests/tail.test.js tests/tail-dom.test.js",
     "test:frames": "node --test tests/frames.test.js",
-    "test:quick": "node --test tests/expansion.test.js tests/tail-dom.test.js tests/frames.test.js"
+    "test:quick": "node --test tests/blueprint.test.js tests/panels.test.js tests/panel-integration.test.js tests/frames.test.js"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",

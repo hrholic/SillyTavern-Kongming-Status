@@ -63,6 +63,6 @@ test('missing initial settings host is retried without creating duplicate panels
         await until(()=>host.querySelector('.kms-count'));
         assert.equal(w.document.querySelectorAll('#kongming-status-settings').length,1);
         assert.match(host.querySelector('.kms-count').textContent,/已启用/);
-        assert.equal(host.querySelector('.kms-version').textContent,'v0.3.1');
+        assert.equal(host.querySelector('.kms-version').textContent,'v0.3.2');
     } finally {plugin.onDisable();dom.window.close();}
 });

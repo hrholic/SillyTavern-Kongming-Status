@@ -1,4 +1,4 @@
-import { comparableText, excludedNames, protectedSource, sourceAllows, isSafeStatusNode } from './core.js?v=0.3.1';
+import { comparableText, excludedNames, protectedSource, sourceAllows, isSafeStatusNode, hiddenSourceTag } from './core.js?v=0.3.2';
 
 const BODY = new Set(['content','context']);
 const VOID = new Set(['br','hr','img','input','meta','link','source','area','base','col','embed','param','track','wbr']);
@@ -30,7 +30,7 @@ function tagTree(raw) {
         const name = match[2].toLowerCase();
         if (VOID.has(name) || /\/\s*>$/.test(match[0])) continue;
         if (!match[1]) {
-            const node = { name, start:match.index, openEnd:match.index+match[0].length, parent:stack.at(-1), valid:true };
+            const node = { name, start:match.index, openEnd:match.index+match[0].length, parent:stack.at(-1), valid:true, hidden:hiddenSourceTag(match[0]) };
             nodes.push(node); stack.push(node);
         } else {
             const node = stack.at(-1);
@@ -89,10 +89,10 @@ export function extractTailStatuses(raw, exclusionText = '') {
     const allText=displayText(source);
     const possible=[];
     for(const node of nodes) {
-        if(!node.valid||node.end===undefined||BODY.has(node.name)||DENIED.test(node.name)||excluded.has(node.name))continue;
+        if(!node.valid||node.hidden||node.end===undefined||BODY.has(node.name)||DENIED.test(node.name)||excluded.has(node.name))continue;
         let unsafe=false;
-        for(let p=node.parent;p;p=p.parent)if(!p.valid||BODY.has(p.name)||DENIED.test(p.name)||excluded.has(p.name)){unsafe=true;break;}
-        if(unsafe || nodes.some(child => child.start > node.start && child.start < node.end && (DENIED.test(child.name) || excluded.has(child.name))))continue;
+        for(let p=node.parent;p;p=p.parent)if(!p.valid||p.hidden||BODY.has(p.name)||DENIED.test(p.name)||excluded.has(p.name)){unsafe=true;break;}
+        if(unsafe || nodes.some(child => child.start > node.start && child.start < node.end && (child.hidden || DENIED.test(child.name) || excluded.has(child.name))))continue;
         const body=source.slice(node.openEnd,node.closeStart);
         const text=comparableText(body),key=displayText(body);
         if(key.length<4||key.length>24000||!structuredFields(body))continue;
@@ -112,6 +112,26 @@ export function extractTailStatuses(raw, exclusionText = '') {
         return !suffix.replace(/<\/[\p{L}_][\p{L}\p{N}_.:-]*\s*>/gu,'').trim();
     });
     return positionSafe.filter(block=>!positionSafe.some(parent=>parent!==block&&parent.start<block.start&&parent.end>block.end));
+}
+
+/** Broad source boundaries for already-rendered independent panels, not raw rendering. */
+export function extractPanelSources(raw, exclusionText='') {
+    if(typeof raw!=='string'||raw.length>500000)return [];
+    const {source,nodes}=tagTree(raw),names=excludedNames(exclusionText);
+    const hasBody=nodes.some(n=>BODY.has(n.name)&&n.valid&&n.end!==undefined);
+    const unsafe=n=>!n.valid||n.hidden||names.has(n.name)||/(?:^|[_:-])cot$/.test(n.name)
+        || /^(?:head|html|body|tool|tool_call|command|updatevariable|tableedit|jsonpatch)$/i.test(n.name);
+    const out=[];
+    for(const node of nodes) {
+        if(unsafe(node)||node.end===undefined)continue;
+        let blocked=false;for(let p=node.parent;p;p=p.parent)if(unsafe(p)){blocked=true;break;}
+        if(blocked||nodes.some(n=>n.start>node.start&&n.start<node.end&&unsafe(n)))continue;
+        const body=source.slice(node.openEnd,node.closeStart),key=displayText(body);
+        if(key.length<4||key.length>60000||(!hasBody&&!structuredFields(body)))continue;
+        if(!sourceAllows(comparableText(body),protectedSource(raw,names)))continue;
+        out.push({tag:node.name,body,key,sourceText:comparableText(body),start:node.start,end:node.end});
+    }
+    return out.filter(n=>!out.some(p=>p.start<n.start&&p.end>n.end));
 }
 
 function canonical(node) { return displayText(node.textContent||''); }

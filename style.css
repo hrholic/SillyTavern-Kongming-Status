@@ -352,3 +352,21 @@
 /* Respect preview switch and preserve line breaks in source-mapped text. */
 #kongming-status-settings .kms-preview [data-kms-demo][hidden] { display: none !important; }
 #chat .mes_text .kms-card[data-kms-tail-wrapper] { white-space: pre-wrap; }
+
+/* Visible renderer shells: never alter content typography, display, position or padding. */
+#chat .mes_text .kms-shell {
+    background-color: var(--kms-surface) !important;
+    border: 1px solid var(--kms-line) !important;
+    border-radius: var(--kms-radius) !important;
+    box-shadow: var(--kms-shadow) !important;
+}
+#chat[data-kms-template="classic"] .mes_text .kms-shell {
+    background-color: transparent !important;
+    background-image: linear-gradient(to right,var(--kms-classic-rule),transparent),linear-gradient(to right,var(--kms-line),transparent) !important;
+    background-position: left top,left bottom !important;
+    background-size: 100% 1px,100% 1px !important;
+    background-repeat: no-repeat !important;
+    border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+}
+#chat[data-kms-template="slate"] .mes_text .kms-shell { border-inline-start: 3px solid var(--kms-accent) !important; }
+#chat[data-kms-template="paper"] .mes_text .kms-shell { border-top: 3px solid var(--kms-accent) !important; }
