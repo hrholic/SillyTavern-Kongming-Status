@@ -1,14 +1,24 @@
 # 验证记录
 
-验证版本：0.2.0。验证日期：2026-11-06。
+验证版本：0.2.1。验证日期：2026-11-06。
 
 ## 已通过
 
 - `node --check index.js` 与 `node --check core.js`：通过。
-- `npm test`：14 / 14 纯逻辑测试通过。
+- `npm test`：15 / 15 纯逻辑测试通过。
 - `npm run test:dom`：24 / 24 jsdom DOM 回归通过。
+- `npm run test:boot`：5 / 5 启动时序回归通过。
+- 以上合计 44 项通过。
 
-本次新增验证：
+0.2.1 新增验证：
+
+- 先在 0.2.0 复现：APP_READY 已过去且不重播时，自定义设置与计数不创建。修复后，相同模拟用例通过。
+- 初始缺少设置容器、后续替换设置容器时，都会建立唯一面板并显示识别状态。
+- 酒馆接口稍后可用时，读取已保存的关闭状态、模板和排除名单，不永久使用默认配置。
+- 等待期间禁用插件，会取消定时重试与被动观察，不会后来自动重新启用。
+- 模板校验不依赖较新的 Object.hasOwn 浏览器 API。
+
+0.2.0 新增验证：
 
 - 插件标题与启用徽标、无障碍开关、状态文字一致。
 - 零识别结果与已关闭状态明确区分。
@@ -36,7 +46,7 @@
 
 ## 未验证
 
-- 上一版尝试 `npm run test:browser` 时，运行环境阻止 Chromium 创建所需进程通信 socket，浏览器在启动阶段报 `Operation not permitted`。本次没有声称该限制已解除；新增浏览器用例已编写但未运行，不能算通过。
+- 本次再次尝试启动浏览器回归时，运行环境仍阻止 Chromium 创建所需进程通信 socket，浏览器在启动阶段报 `Operation not permitted`。浏览器测试步骤未能运行，不能算通过。
 - 未完成真实浏览器的截图、手机宽度、视觉布局及性能验证。
 - 未完成真实 SillyTavern 安装后的集成测试；jsdom 使用的是模拟上下文和事件，不代替真实酒馆。
 - 未测试所有角色卡、主题、预设正则、酒馆助手或 iframe 渲染组合。
@@ -50,3 +60,11 @@
 - 官方 SillyTavern 当前 release 分支的扩展 manifest、上下文事件和 disable hook 经源码核查。
 
 运行依赖仅用于开发测试；安装到酒馆不需要 `npm install` 或 Node 测试依赖。
+
+## 启动缺陷的官方源码依据
+
+- [1.12.12 的 EventEmitter.on 不重播旧事件](https://github.com/SillyTavern/SillyTavern/blob/1.12.12/public/lib/eventemitter.js#L24-L41)。
+- [1.12.12 安装扩展后会加载模块并发出 EXTENSION_SETTINGS_LOADED，而不是再次发出 APP_READY](https://github.com/SillyTavern/SillyTavern/blob/1.12.12/public/scripts/extensions.js#L926-L979)。
+- [1.13.4 的重播状态在异步 emit 完成后才记录](https://github.com/SillyTavern/SillyTavern/blob/1.13.4/public/lib/eventemitter.js#L122-L147)。
+
+这证明启动路径存在缺陷，但在没有接入用户实际酒馆页面的情况下，不能认定它是某一次用户反馈的唯一原因。

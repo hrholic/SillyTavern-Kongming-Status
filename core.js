@@ -28,7 +28,7 @@ export function normalizeSettings(value = {}) {
     return {
         enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
         theme: ['auto', 'light', 'dark'].includes(value.theme) ? value.theme : 'auto',
-        template: Object.hasOwn(TEMPLATES, value.template) ? value.template : 'classic',
+        template: Object.prototype.hasOwnProperty.call(TEMPLATES, value.template) ? value.template : 'classic',
         deep: value.deep === true,
         selectors: typeof value.selectors === 'string' ? value.selectors.slice(0, 1000) : '',
         excluded: typeof value.excluded === 'string' ? value.excluded.slice(0, 2000) : '',

@@ -1,11 +1,13 @@
 {
   "display_name": "统一状态栏",
   "author": "hrholic",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "loading_order": 100,
   "requires": [],
   "optional": [],
   "js": "index.js",
   "css": "style.css",
-  "hooks": { "disable": "onDisable" }
+  "hooks": {
+    "disable": "onDisable"
+  }
 }

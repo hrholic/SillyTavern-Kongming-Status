@@ -1,12 +1,13 @@
 {
   "name": "sillytavern-kongming-status",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/core.test.js",
     "test:browser": "node tests/browser.test.js",
-    "test:dom": "node --test tests/dom.test.js"
+    "test:dom": "node --test tests/dom.test.js",
+    "test:boot": "node --test tests/boot.test.js tests/context-boot.test.js"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",

@@ -1,6 +1,7 @@
-import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js';
+import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers } from './core.js?v=0.2.1';
 
 const KEY = 'kongming_status';
+const VERSION = '0.2.1';
 let context;
 let settings = { ...DEFAULTS };
 let started = false;
@@ -12,6 +13,9 @@ let settingsPanel;
 let disabledByHost = false;
 let readyTimer = 0;
 let readyListener;
+let bootObserver;
+let bootNotice;
+let bootAttempts = 0;
 const dirty = new Set();
 const decorated = new Set();
 const protectedCounts = new Map();
@@ -22,6 +26,50 @@ function element(tag, className, text) {
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+}
+
+function getContextSafely() {
+    try { return globalThis.SillyTavern?.getContext?.(); }
+    catch { return undefined; }
+}
+
+function settingsHost() {
+    return document.getElementById('extensions_settings') || document.getElementById('extensions_settings2');
+}
+
+function showBootNotice(message) {
+    const host = settingsHost();
+    if (!host) return;
+    if (!bootNotice?.isConnected) {
+        bootNotice = element('section', 'kms-settings kms-boot-notice');
+        bootNotice.id = 'kongming-status-boot';
+        bootNotice.append(element('strong', '', `统一状态栏 v${VERSION}`));
+        const status = element('p', 'kms-boot-status'); status.setAttribute('role', 'status');
+        const retry = element('button', 'menu_button', '重新加载插件'); retry.type = 'button';
+        retry.addEventListener('click', () => { bootAttempts = 0; queueStart(); });
+        bootNotice.append(status, retry); host.append(bootNotice);
+    }
+    const status = bootNotice.querySelector('.kms-boot-status');
+    if (status.textContent !== message) status.textContent = message;
+}
+
+function queueStart() {
+    if (disabledByHost || started) return;
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(start, 0);
+}
+
+function waitForHost() {
+    if (document.body && !bootObserver) {
+        bootObserver = new MutationObserver(() => {
+            if (!started && !disabledByHost && settingsHost() && getContextSafely()?.extensionSettings) queueStart();
+        });
+        bootObserver.observe(document.body, { childList: true, subtree: true });
+    }
+    showBootNotice(bootAttempts < 80
+        ? '插件已加载，正在等待酒馆加载完成。'
+        : '插件已加载，但暂未连接到酒馆界面。可以点“重新加载插件”重试。');
+    if (bootAttempts++ < 80) readyTimer = setTimeout(start, 250);
 }
 
 function messageFor(node) {
@@ -49,7 +97,7 @@ function unstyle(node) {
 function scan(message) {
     const idText = message.closest('.mes')?.getAttribute('mesid');
     const id = /^\d+$/.test(idText ?? '') ? Number(idText) : -1;
-    const current = globalThis.SillyTavern?.getContext?.() ?? context;
+    const current = getContextSafely() ?? context;
     const raw = Number.isInteger(id) && id >= 0 ? current?.chat?.[id]?.mes : undefined;
     const { roots, protectedCount = 0 } = settings.enabled && eligible(message)
         ? findStatusRoots(message, settings.selectors, settings.excluded, raw) : { roots: new Map() };
@@ -163,15 +211,14 @@ function save() {
 }
 
 function buildSettings() {
-    const target = document.getElementById('extensions_settings')
-        || document.getElementById('extensions_settings2');
+    const target = settingsHost();
     if (!target || settingsPanel?.isConnected) return;
     settingsPanel = element('details', 'kms-settings');
     settingsPanel.id = 'kongming-status-settings';
     settingsPanel.open = true;
     const heading = element('summary', 'kms-settings-heading');
     const badge = element('span', 'kms-enable-badge'); badge.setAttribute('role', 'status');
-    heading.append(element('span', 'kms-settings-title', '统一状态栏'), badge);
+    heading.append(element('span', 'kms-settings-title', '统一状态栏'), element('small', 'kms-version', `v${VERSION}`), badge);
     settingsPanel.append(heading);
     const content = element('div', 'kms-settings-body');
 
@@ -251,6 +298,8 @@ function buildSettings() {
     actions.append(rescan);
     content.append(actions); settingsPanel.append(content); target.append(settingsPanel);
     refreshControls();
+    refreshCount();
+    return true;
 }
 
 function onMutations(records) {
@@ -268,13 +317,18 @@ function onMutations(records) {
         }
     }
     if (fullScan || dirty.size) schedule();
-    if (!settingsPanel?.isConnected) buildSettings();
+    if (!settingsPanel?.isConnected && buildSettings()) schedule(true);
 }
 
 function start() {
-    if (disabledByHost || started || !document.body) return;
-    started = true;
-    context = globalThis.SillyTavern?.getContext?.();
+    readyTimer = 0;
+    if (disabledByHost || started) return;
+    const availableContext = getContextSafely();
+    if (!document.body || !settingsHost() || !availableContext?.extensionSettings) {
+        waitForHost();
+        return;
+    }
+    context = availableContext;
     settings = normalizeSettings(context?.extensionSettings?.[KEY]);
     buildSettings();
     observer = new MutationObserver(onMutations);
@@ -293,11 +347,18 @@ function start() {
         context.eventSource.on(events[name], handler);
         listeners.push([events[name], handler]);
     }
+    started = true;
+    bootObserver?.disconnect(); bootObserver = null;
+    bootNotice?.remove(); bootNotice = null;
+    bootAttempts = 0;
     schedule(true);
 }
 
 // Also useful for extension development and a clean shutdown before reload.
 export function stop() {
+    clearTimeout(readyTimer); readyTimer = 0;
+    bootObserver?.disconnect(); bootObserver = null;
+    bootNotice?.remove(); bootNotice = null;
     observer?.disconnect(); themeObserver?.disconnect();
     if (scheduled) cancelAnimationFrame(scheduled);
     scheduled = 0;
@@ -315,16 +376,20 @@ export function onDisable() {
     disabledByHost = true;
     clearTimeout(readyTimer);
     if (readyListener) initialContext?.eventSource?.removeListener?.(ready, readyListener);
+    document.removeEventListener('DOMContentLoaded', queueStart);
     stop();
 }
 
-const initialContext = globalThis.SillyTavern?.getContext?.();
+const initialContext = getContextSafely();
 const ready = (initialContext?.eventTypes ?? initialContext?.event_types)?.APP_READY;
 if (ready && initialContext?.eventSource?.on) {
-    readyListener = () => { readyTimer = setTimeout(start, 0); };
+    readyListener = queueStart;
     initialContext.eventSource.on(ready, readyListener);
-} else if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
+}
+// APP_READY may already have fired (older ST emitters do not replay it).
+// Bootstrap independently, and retry boundedly until the API and settings host exist.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', queueStart, { once: true });
 } else {
-    start();
+    queueStart();
 }

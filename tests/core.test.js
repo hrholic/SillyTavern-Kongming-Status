@@ -25,6 +25,14 @@ test('legacy settings retain enabled state, theme and exclusions while defaultin
     assert.equal(normalizeSettings({ template: '__proto__' }).template, 'classic');
     for (const template of ['classic','slate','paper']) assert.equal(normalizeSettings({ template }).template, template);
 });
+test('template validation does not require the newer Object.hasOwn browser API',()=>{
+    const saved=Object.hasOwn;
+    try {
+        Object.hasOwn=undefined;
+        assert.equal(normalizeSettings({template:'paper'}).template,'paper');
+        assert.equal(normalizeSettings({template:'__proto__'}).template,'classic');
+    } finally {Object.hasOwn=saved;}
+});
 test('new templates have distinct fixed modes while original keeps its day/night preference', () => {
     assert.equal(TEMPLATES.slate.mode, 'dark');
     assert.equal(TEMPLATES.paper.mode, 'light');

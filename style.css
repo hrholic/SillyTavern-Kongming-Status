@@ -147,6 +147,9 @@
 .kms-settings { border: 1px solid var(--SmartThemeBorderColor, #8885); border-radius: 9px; margin-block: 8px; }
 .kms-settings > summary { padding: 12px; font-weight: 600; cursor: pointer; }
 .kms-settings .kms-settings-title { margin-inline-end: 10px; }
+.kms-settings .kms-version { margin-inline-end: 10px; font-size: 0.72em; font-weight: 400; opacity: 0.7; }
+.kms-boot-notice { padding: 12px; }
+.kms-boot-notice .kms-boot-status { margin-block: 8px; font-size: 0.88em; line-height: 1.6; }
 .kms-settings .kms-enable-badge { display: inline-block; padding: 2px 8px; border: 1px solid #8b969f80; border-radius: 20px; background: #727e881a; font-size: 0.78em; font-weight: 650; white-space: nowrap; }
 .kms-settings[data-kms-enabled="true"] .kms-enable-badge { color: #c5f0dd; background: #215743; border-color: #37755c; }
 .kms-settings[data-kms-enabled="false"] .kms-enable-badge { color: #e1e5e9; background: #505861; border-color: #68717b; }
