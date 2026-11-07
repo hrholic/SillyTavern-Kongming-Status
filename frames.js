@@ -1,9 +1,9 @@
 /** Visible same-origin message frames only; background helper frames are excluded. Never changes frame content or sources. */
-import { findStatusRoots, excludedNames, protectedSource, sourceAllows, isSafeStatusNode } from './core.js?v=0.3.2';
-import { planTailStatuses } from './tail.js?v=0.3.2';
+import { findStatusRoots, excludedNames, protectedSource, sourceAllows, isSafeStatusNode } from './core.js?v=0.3.3';
+import { planTailStatuses } from './tail.js?v=0.3.3';
 
-import { findBlueprintRoots } from './blueprint.js?v=0.3.2';
-import { findRenderedPanelRoots } from './panels.js?v=0.3.2';
+import { findBlueprintRoots } from './blueprint.js?v=0.3.3';
+import { findRenderedPanelRoots } from './panels.js?v=0.3.3';
 
 const MARK = 'kms-frame-shell';
 const PROTECTED = 'content context think thinking thought thoughts analysis reasoning preprint ecot cot scratchpad scratch_pad chain_of_thought chain-of-thought internal internal_thought internal_thoughts internal_reasoning hidden_thought hidden_thoughts thinking_process reasoning_process system system_prompt instructions instruction control tool tool_call tool_calls function_call';
@@ -111,7 +111,7 @@ export function createFrameController({ getSettings, getMode = () => 'light', ge
         const roots = new Set();
         if(!blockedIdentity(state.frame,names)){
             for(const candidate of findBlueprintRoots(doc.body,raw,settings.excluded).keys())roots.add(candidate);
-            for(const candidate of findRenderedPanelRoots(doc.body,raw,settings.excluded).keys())roots.add(candidate);
+            for(const candidate of findRenderedPanelRoots(doc.body,raw,settings.excluded,settings.manualRules).keys())roots.add(candidate);
         }
         const blueprints = [...doc.body.querySelectorAll('#tb.tb')];
         const found = findStatusRoots(doc.body, settings.selectors || '', `${PROTECTED} ${settings.excluded || ''}`, raw);
@@ -124,7 +124,7 @@ export function createFrameController({ getSettings, getMode = () => 'light', ge
         // or copy raw source into the frame. Blueprint frames use their stricter path.
         if (!blueprints.length && !blockedIdentity(state.frame, names)) {
             const exclusion = `${PROTECTED} ${settings.excluded || ''}`;
-            const plan = planTailStatuses(doc.body, raw, exclusion, { existingOnly: true });
+            const plan = planTailStatuses(doc.body, raw, exclusion, { existingOnly: true, manualRules: settings.manualRules });
             for (const [root, evidence] of plan.existing) {
                 if (root !== doc.body && visible(root) && isSafeStatusNode(doc.body, root, exclusion)
                     && !blockedIdentity(root, names)

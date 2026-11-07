@@ -6,6 +6,7 @@ export const DEFAULTS = Object.freeze({
     deep: false,
     selectors: '',
     excluded: '',
+    manualRules: Object.freeze([]),
 });
 export const TEMPLATES = Object.freeze({
     classic: { label: '原有 · 空明', description: '透明底、渐隐细线与左对齐书卷排版，保留日夜配色。', mode: null },
@@ -25,6 +26,29 @@ const SKIP = 'pre,code,script,style,textarea,input,button,svg,canvas,iframe,[hid
 const TOKEN = /(?:^|[\s_-])(?:status(?:[\s_-]?(?:bar|panel|box|card|sheet|window))?|state[\s_-]bar|charstatus|character[\s_-]?(?:status|stats)|stats)(?:$|[\s_-])/i;
 const CJK = /状态栏|状态面板|角色状态|人物状态|角色信息|人物信息|属性面板/;
 
+/** Manual rules are literal matching tag pairs, never regular expressions or HTML templates. */
+export function normalizeManualRule(value) {
+    if (!value || typeof value.start !== 'string' || typeof value.end !== 'string') return null;
+    const start = value.start.trim(), end = value.end.trim();
+    if (start.length > 100 || end.length > 100) return null;
+    const opening = start.match(/^<([\p{L}_][\p{L}\p{N}_.:-]*)>$/u);
+    const closing = end.match(/^<\/([\p{L}_][\p{L}\p{N}_.:-]*)>$/u);
+    if (!opening || !closing || opening[1].toLowerCase() !== closing[1].toLowerCase()) return null;
+    const tag = opening[1].toLowerCase();
+    if (excludedNames().has(tag) || /(?:think|thought|reason|analysis|hidden|secret|instruction|prompt|system|(?:^|[_:-])cot$|思考|思维|推理|隐藏|秘密|指令)/i.test(tag)
+        || /^(?:html|head|body|iframe|input|button|br|hr|img|area|base|col|embed|link|meta|param|source|track|wbr)$/i.test(tag)) return null;
+    return { start: `<${tag}>`, end: `</${tag}>` };
+}
+export function normalizeManualRules(value) {
+    if (!Array.isArray(value)) return [];
+    const found = new Map();
+    for (const item of value.slice(0, 50)) {
+        const rule = normalizeManualRule(item);
+        if (rule) found.set(rule.start, rule);
+    }
+    return [...found.values()];
+}
+
 export function normalizeSettings(value = {}) {
     if (!value || typeof value !== 'object') value = {};
     return {
@@ -34,6 +58,7 @@ export function normalizeSettings(value = {}) {
         deep: value.deep === true,
         selectors: typeof value.selectors === 'string' ? value.selectors.slice(0, 1000) : '',
         excluded: typeof value.excluded === 'string' ? value.excluded.slice(0, 2000) : '',
+        manualRules: normalizeManualRules(value.manualRules),
     };
 }
 

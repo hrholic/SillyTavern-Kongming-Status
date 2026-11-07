@@ -1,8 +1,8 @@
 /** Re-style already-visible panel shells using source boundaries and unchanged text anchors.
  * This module never renders source content, copies hidden data, or changes visibility.
  */
-import {excludedNames, protectedSource} from './core.js?v=0.3.2';
-import {extractPanelSources, displayText} from './tail.js?v=0.3.2';
+import {excludedNames, protectedSource} from './core.js?v=0.3.3';
+import {extractPanelSources, extractManualStatuses, displayText} from './tail.js?v=0.3.3';
 const OMIT='pre,code,script,style,textarea,input,button,iframe,svg,canvas,[data-kms-ignore]';
 function visible(node) {
     for(let p=node;p;p=p.parentElement) {
@@ -51,8 +51,10 @@ function panelShape(node) {
     const backdrop=s&&s.backgroundColor&&!['transparent','rgba(0, 0, 0, 0)'].includes(s.backgroundColor);
     return Boolean(heading&&(named||edge||backdrop));
 }
-export function findRenderedPanelRoots(root,raw,exclusionText='') {
-    const sources=extractPanelSources(raw,exclusionText),found=new Map();
+export function findRenderedPanelRoots(root,raw,exclusionText='',manualRules=[]) {
+    const selected = new Map(extractPanelSources(raw,exclusionText).map(block => [block.start, block]));
+    for (const block of extractManualStatuses(raw,manualRules,exclusionText)) selected.set(block.start,block);
+    const sources=[...selected.values()],found=new Map();
     if(!sources.length)return found;
     const names=excludedNames(exclusionText),explicit=excludedNames(exclusionText);
     if(!/(?:^|[,，;；\s])[<\/.#]*content(?:>|[,，;；\s]|$)/i.test(exclusionText))explicit.delete('content');

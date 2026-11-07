@@ -1,12 +1,12 @@
-import { DEFAULTS, TEMPLATES, normalizeSettings, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.2';
-import { planTailStatuses } from './tail.js?v=0.3.2';
-import { createFrameController } from './frames.js?v=0.3.2';
+import { DEFAULTS, TEMPLATES, normalizeSettings, normalizeManualRule, findStatusRoots, textColorMeansDark, literalStatus, ownedMarkers, ownedWrappers } from './core.js?v=0.3.3';
+import { planTailStatuses } from './tail.js?v=0.3.3';
+import { createFrameController } from './frames.js?v=0.3.3';
 
-import { findBlueprintRoots } from './blueprint.js?v=0.3.2';
-import { findRenderedPanelRoots } from './panels.js?v=0.3.2';
+import { findBlueprintRoots } from './blueprint.js?v=0.3.3';
+import { findRenderedPanelRoots } from './panels.js?v=0.3.3';
 
 const KEY = 'kongming_status';
-const VERSION = '0.3.2';
+const VERSION = '0.3.3';
 let context;
 let settings = { ...DEFAULTS };
 let started = false;
@@ -130,11 +130,11 @@ function hideSourceMarkers(root, tag) {
 function scan(message) {
     const raw = rawMessageFor(message);
     const shells=settings.enabled&&eligible(message)?new Map([
-        ...findRenderedPanelRoots(message,raw,settings.excluded),
+        ...findRenderedPanelRoots(message,raw,settings.excluded,settings.manualRules),
         ...findBlueprintRoots(message,raw,settings.excluded),
     ]):new Map();
     for(const node of shells.keys())for(let p=node.parentElement;p&&p!==message;p=p.parentElement)if(shells.has(p)){shells.delete(node);break;}
-    const plan=settings.enabled&&eligible(message)?planTailStatuses(message,raw,settings.excluded):{existing:new Map(),groups:[]};
+    const plan=settings.enabled&&eligible(message)?planTailStatuses(message,raw,settings.excluded,{manualRules:settings.manualRules}):{existing:new Map(),groups:[]};
     const additional=new Map(),sourceTags=new Map(),created=[];
     for(const [node,item] of plan.existing){additional.set(node,item);sourceTags.set(node,item.tag);}
     for(const group of plan.groups){
@@ -264,6 +264,77 @@ function save() {
     schedule(true);
 }
 
+function manualRulesEditor() {
+    const section = element('section', 'kms-manual-rules');
+    section.setAttribute('aria-label', '手动状态栏标签');
+    section.append(element('strong', '', '手动指定状态栏'));
+    section.append(element('p', 'kms-help', '填一次开始和结束标签，保存后会用于当前及之后的聊天。每组标签保存一条，不需要写选择器。'));
+    const fields = element('div', 'kms-manual-fields');
+    function field(label, name, placeholder) {
+        const row = element('label', 'kms-field', label), input = element('input', 'text_pole');
+        input.type = 'text'; input.maxLength = 100; input.placeholder = placeholder;
+        input.dataset.kmsRule = name; input.autocomplete = 'off'; input.spellcheck = false;
+        row.append(input); fields.append(row); return input;
+    }
+    const opening = field('开始标签', 'start', '<my_panel>');
+    const closing = field('结束标签', 'end', '</my_panel>');
+    const actions = element('div', 'kms-actions');
+    const submit = element('button', 'menu_button', '保存规则'); submit.type = 'button'; submit.dataset.kmsRuleAction = 'save';
+    const cancel = element('button', 'menu_button', '取消修改'); cancel.type = 'button'; cancel.hidden = true;
+    const status = element('p', 'kms-help'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    status.dataset.kmsRuleStatus = '';
+    const list = element('ul', 'kms-rule-list');
+    let editing = null;
+    function reset() { editing = null; opening.value = closing.value = ''; submit.textContent = '保存规则'; cancel.hidden = true; }
+    function renderList() {
+        list.replaceChildren();
+        if (!settings.manualRules.length) list.append(element('li', 'kms-help', '还没有保存规则。'));
+        for (const rule of settings.manualRules) {
+            const row = element('li', 'kms-rule-row');
+            row.append(element('span', 'kms-rule-pair', `${rule.start} … ${rule.end}`));
+            const edit = element('button', 'menu_button', '修改'); edit.type = 'button';
+            edit.setAttribute('aria-label', `修改 ${rule.start} 规则`);
+            edit.addEventListener('click', () => {
+                editing = rule.start; opening.value = rule.start; closing.value = rule.end;
+                submit.textContent = '保存修改'; cancel.hidden = false; status.textContent = ''; opening.focus();
+            });
+            const remove = element('button', 'menu_button', '删除'); remove.type = 'button';
+            remove.setAttribute('aria-label', `删除 ${rule.start} 规则`);
+            remove.addEventListener('click', () => {
+                settings.manualRules = settings.manualRules.filter(item => item.start !== rule.start);
+                if (editing === rule.start) reset();
+                save(); renderList(); status.textContent = '规则已删除。自动识别与不识别名单仍然生效。';
+            });
+            row.append(edit, remove); list.append(row);
+        }
+    }
+    opening.addEventListener('change', () => {
+        const match = opening.value.trim().match(/^<([\p{L}_][\p{L}\p{N}_.:-]*)>$/u);
+        if (match && !closing.value.trim()) closing.value = `</${match[1]}>`;
+    });
+    submit.addEventListener('click', () => {
+        const rule = normalizeManualRule({ start: opening.value, end: closing.value });
+        if (!rule) {
+            status.textContent = '请填同名成对标签，例如 <my_panel> 和 </my_panel>。暂不支持带属性的标签、正则或任意分隔符；正文、思考、隐藏标签不能添加。';
+            return;
+        }
+        if (settings.manualRules.some(item => item.start === rule.start && item.start !== editing)) {
+            status.textContent = '这组标签已经保存，可以在下方点“修改”。'; return;
+        }
+        if (editing === null && settings.manualRules.length >= 50) {
+            status.textContent = '最多保存 50 条规则，请先删除不用的规则。'; return;
+        }
+        settings.manualRules = editing === null ? [...settings.manualRules, rule]
+            : settings.manualRules.map(item => item.start === editing ? rule : item);
+        reset(); save(); renderList();
+        status.textContent = '已保存，正在重新识别当前聊天；之后的聊天会自动沿用。';
+    });
+    cancel.addEventListener('click', () => { reset(); status.textContent = '已取消修改，保存的规则没有改变。'; });
+    actions.append(submit, cancel); section.append(fields, actions, status, list);
+    section.append(element('p', 'kms-help', '不识别名单与正文 / 思考 / 隐藏保护始终优先。只美化能对应到已显示内容的区域；复杂正则或 iframe 若已丢失对应关系，仍可能跳过。不会取出原文中的隐藏内容。'));
+    renderList(); return section;
+}
+
 function buildSettings() {
     const target = settingsHost();
     if (!target || settingsPanel?.isConnected) return;
@@ -288,7 +359,7 @@ function buildSettings() {
     switchTrack.append(element('span', 'kms-switch-word'));
     enableRow.append(enableText, enableInput, switchTrack); content.append(enableRow);
     const count = element('p', 'kms-count'); count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite');
-    content.append(count);
+    content.append(count, manualRulesEditor());
 
     const templateLabel = element('label', 'kms-field', '样式模板');
     const templateSelect = element('select', 'text_pole'); templateSelect.dataset.kmsSetting = 'template';
@@ -337,7 +408,7 @@ function buildSettings() {
     select.addEventListener('change', () => { settings.theme = select.value; save(); });
     label.append(select); content.append(label, element('p', 'kms-theme-note'));
     checkbox('深入配色（覆盖内部文字与底色，可能改变原栏配色）', 'deep');
-    const custom = element('label', 'kms-field', '额外状态栏选择器（选填）');
+    const custom = element('label', 'kms-field', '高级：额外状态栏选择器（选填）');
     const input = element('input', 'text_pole'); input.type = 'text'; input.maxLength = 1000;
     input.placeholder = '.my-status, #character-panel'; input.value = settings.selectors;
     input.dataset.kmsSetting = 'selectors';

@@ -1,4 +1,4 @@
-import { comparableText, excludedNames, protectedSource, sourceAllows, isSafeStatusNode, hiddenSourceTag } from './core.js?v=0.3.2';
+import { comparableText, excludedNames, protectedSource, sourceAllows, isSafeStatusNode, hiddenSourceTag, normalizeManualRules } from './core.js?v=0.3.3';
 
 const BODY = new Set(['content','context']);
 const VOID = new Set(['br','hr','img','input','meta','link','source','area','base','col','embed','param','track','wbr']);
@@ -19,7 +19,7 @@ function maskExamples(raw) {
         // Indentation inside HTML is not necessarily Markdown code. Final DOM safety
         // rejects pre/code and their ancestors; never turn displayed code into a panel.
         return line.replace(/`[^`\n]*`/g, match => ' '.repeat(match.length));
-    }).join('').replace(/<!--[\s\S]*?-->/g, match => ' '.repeat(match.length));
+    }).join('').replace(/<!--[\s\S]*?(?:-->|$)/g, match => ' '.repeat(match.length));
 }
 
 function tagTree(raw) {
@@ -30,7 +30,7 @@ function tagTree(raw) {
         const name = match[2].toLowerCase();
         if (VOID.has(name) || /\/\s*>$/.test(match[0])) continue;
         if (!match[1]) {
-            const node = { name, start:match.index, openEnd:match.index+match[0].length, parent:stack.at(-1), valid:true, hidden:hiddenSourceTag(match[0]) };
+            const node = { name, start:match.index, openEnd:match.index+match[0].length, parent:stack.at(-1), markup:match[0], valid:true, hidden:hiddenSourceTag(match[0]) };
             nodes.push(node); stack.push(node);
         } else {
             const node = stack.at(-1);
@@ -134,6 +134,42 @@ export function extractPanelSources(raw, exclusionText='') {
     return out.filter(n=>!out.some(p=>p.start<n.start&&p.end>n.end));
 }
 
+/** Explicit saved tags bypass automatic name/field/position guesses, never safety gates. */
+export function extractManualStatuses(raw, rules = [], exclusionText = '') {
+    if (typeof raw !== 'string' || raw.length > 500000) return [];
+    const wanted = new Set(normalizeManualRules(rules).map(rule => rule.start.slice(1, -1)));
+    if (!wanted.size) return [];
+    const { source, nodes } = tagTree(raw), names = excludedNames(exclusionText);
+    const protectedName = name => names.has(name.replace(/^custom-/, ''))
+        || /(?:think|thought|reason|analysis|hidden|secret|instruction|prompt|system|(?:^|[_:-])cot$|思考|思维|推理|隐藏|秘密|指令)/i.test(name);
+    const unsafe = node => !node.valid || node.end === undefined || node.hidden || protectedName(node.name)
+        || /\sdata-kms-ignore(?:\s|=|>)/i.test(node.markup)
+        || /\b(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?:\.0+)?(?=\s*(?:[;\"']|>|$)))/i.test(node.markup)
+        || [...node.markup.matchAll(/\b(?:class|id|data-role|data-type)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
+            .some(match => (match[1] ?? match[2] ?? match[3] ?? '').split(/\s+/).some(protectedName));
+    const allText = displayText(source), protection = protectedSource(raw, names), out = [];
+    for (const node of nodes) {
+        if (!wanted.has(node.name) || unsafe(node)) continue;
+        let blocked = false;
+        for (let parent = node.parent; parent; parent = parent.parent) if (unsafe(parent)) { blocked = true; break; }
+        if (blocked || nodes.some(child => child.start > node.start && child.start < node.end && unsafe(child))) continue;
+        const body = source.slice(node.openEnd, node.closeStart), text = comparableText(body), key = displayText(body);
+        if (key.length < 4 || key.length > 60000 || !sourceAllows(text, protection) || !mappedAllows(key, protection)) continue;
+        // A removed tag cannot tell identical narrative and panel text apart.
+        if (allText.indexOf(key) < 0 || allText.indexOf(key) !== allText.lastIndexOf(key)) continue;
+        out.push({ tag: node.name, body, text, sourceText: text, key, start: node.start, end: node.end, manual: true });
+    }
+    return out.filter(block => !out.some(parent => parent.start < block.start && parent.end > block.end));
+}
+
+// Do not read closed disclosure bodies even if a DOM emulator reports them visible.
+function readableManualNode(node) {
+    for (let current = node.nodeType === 1 ? node : node.parentElement; current; current = current.parentElement) {
+        if (current.tagName === 'DETAILS' && !current.open) return false;
+    }
+    return !node.querySelector?.('details:not([open])');
+}
+
 function canonical(node) { return displayText(node.textContent||''); }
 function visibleMarker(node, tag, closing=false) {
     return (node.textContent||'').trim().toLowerCase()===`<${closing?'/':''}${tag}>`;
@@ -141,7 +177,9 @@ function visibleMarker(node, tag, closing=false) {
 
 /** Plans changes to ALREADY VISIBLE nodes. Raw contents are never rendered. */
 export function planTailStatuses(root, raw, exclusionText = '', options = {}) {
-    const blocks=extractTailStatuses(raw,exclusionText);
+    const selected = new Map(extractTailStatuses(raw,exclusionText).map(block => [block.start, block]));
+    for (const block of extractManualStatuses(raw, options.manualRules, exclusionText)) selected.set(block.start, block);
+    const blocks = [...selected.values()].filter(block => ![...selected.values()].some(parent => parent.start < block.start && parent.end > block.end));
     const protection=protectedSource(raw,excludedNames(exclusionText));
     const existing=new Map(),groups=[];
     const all=[...root.querySelectorAll('*')];
@@ -151,20 +189,20 @@ export function planTailStatuses(root, raw, exclusionText = '', options = {}) {
     const parents=[root,...all.filter(node=>node.childNodes.length>1&&!node.closest('pre,code,script,style,textarea,input,button,iframe,svg,canvas'))].slice(0,160);
     for(const block of blocks) {
         if(!sourceAllows(block.text,protection)||!mappedAllows(block.key,protection))continue;
-        const matches=eligible.filter(node=>canonical(node)===block.key);
+        const matches=eligible.filter(node=>(!block.manual || readableManualNode(node)) && canonical(node)===block.key);
         const outer=matches.filter(node=>!matches.some(parent=>parent!==node&&parent.contains(node)));
-        const evidence={tag:block.tag,sourceText:block.text,reason:'正文后状态结构'};
+        const evidence={tag:block.tag,sourceText:block.text,reason:block.manual ? '手动标签规则' : '正文后状态结构'};
         if(outer.length===1) {existing.set(outer[0],evidence);continue;}
         if(outer.length>1||options.existingOnly)continue;
         const ranges=[];
         for(const parent of parents) {
             const siblings=[...parent.childNodes];if(siblings.length>200)continue;
             for(let start=0;start<siblings.length;start++) {
-                if(!isSafeStatusNode(root,siblings[start],exclusionText)||!canonical(siblings[start]))continue;
+                if(!isSafeStatusNode(root,siblings[start],exclusionText)||(block.manual&&!readableManualNode(siblings[start]))||!canonical(siblings[start]))continue;
                 let text='';
                 for(let end=start;end<siblings.length;end++) {
                     const node=siblings[end];
-                    if(!isSafeStatusNode(root,node,exclusionText))break;
+                    if(!isSafeStatusNode(root,node,exclusionText)||(block.manual&&!readableManualNode(node)))break;
                     text+=canonical(node);
                     if(text.length>block.key.length)break;
                     if(text===block.key) {

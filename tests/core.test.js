@@ -15,12 +15,12 @@ test('does not mistake prose, HP words, or generic headings for status panels', 
 });
 test('settings reject invalid types and clamp selector/exclusion length', () => {
     assert.deepEqual(normalizeSettings({ enabled: 'false', theme: 'blue', deep: 1 }),
-        { enabled: true, theme: 'auto', template: 'classic', deep: false, selectors: '', excluded: '' });
+        { enabled: true, theme: 'auto', template: 'classic', deep: false, selectors: '', excluded: '', manualRules: [] });
     assert.equal(normalizeSettings({ selectors: 'x'.repeat(1200) }).selectors.length, 1000);
 });
 test('legacy settings retain enabled state, theme and exclusions while defaulting to original template', () => {
-    const migrated = normalizeSettings({ enabled: false, theme: 'dark', deep: true, excluded: 'special-panel', selectors: '#panel' });
-    assert.deepEqual(migrated, { enabled: false, theme: 'dark', template: 'classic', deep: true, excluded: 'special-panel', selectors: '#panel' });
+    const migrated = normalizeSettings({ enabled: false, theme: 'dark', deep: true, excluded: 'special-panel', selectors: '#panel', manualRules: [] });
+    assert.deepEqual(migrated, { enabled: false, theme: 'dark', template: 'classic', deep: true, excluded: 'special-panel', selectors: '#panel', manualRules: [] });
     assert.equal(normalizeSettings(null).template, 'classic');
     assert.equal(normalizeSettings({ template: '__proto__' }).template, 'classic');
     for (const template of ['classic','slate','paper']) assert.equal(normalizeSettings({ template }).template, template);

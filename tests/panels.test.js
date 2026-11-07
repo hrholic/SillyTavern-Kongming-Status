@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {findRenderedPanelRoots} from '../panels.js';
-import {findStatusRoots,protectedSource,excludedNames,sourceAllows} from '../core.js?v=0.3.2';
+import {findStatusRoots,protectedSource,excludedNames,sourceAllows} from '../core.js?v=0.3.3';
 const first='清晨的图书馆二层靠窗长桌',second='准备归还借阅书籍并整理今天的笔记';
 const data=`地点：${first}\n计划：${second}`;
 const card=`<section class="custom-card"><header>资料面板</header><p>${first}</p><p>${second}</p></section>`;

@@ -370,3 +370,13 @@
 }
 #chat[data-kms-template="slate"] .mes_text .kms-shell { border-inline-start: 3px solid var(--kms-accent) !important; }
 #chat[data-kms-template="paper"] .mes_text .kms-shell { border-top: 3px solid var(--kms-accent) !important; }
+
+/* Saved tag rules: literal text inputs, compact controls, no chat content preview. */
+.kms-settings .kms-manual-rules { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--SmartThemeBorderColor, #7776); border-radius: 6px; }
+.kms-settings .kms-manual-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kms-settings .kms-manual-fields input { width: 100%; min-width: 0; }
+.kms-settings .kms-rule-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.kms-settings .kms-rule-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kms-settings .kms-rule-pair { flex: 1 1 180px; overflow-wrap: anywhere; font-family: monospace; }
+.kms-settings .kms-manual-rules [hidden] { display: none !important; }
+@media (max-width: 480px) { .kms-settings .kms-manual-fields { grid-template-columns: 1fr; } }

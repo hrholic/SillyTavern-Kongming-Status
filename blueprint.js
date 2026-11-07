@@ -1,7 +1,7 @@
 /** Independent, read-only adapters for verified rendered module shells.
  * No source HTML is rendered, and no element text (including hidden raw fields) is read.
  */
-import { excludedNames } from './core.js?v=0.3.2';
+import { excludedNames } from './core.js?v=0.3.3';
 
 const DENIED = /^(?:content|context|xp_cot|think|thinking|thoughts?|analysis|reasoning|preprint|ecot|cot|scratch_?pad|chain[_-]?of[_-]?thought|internal(?:[_-].*)?|hidden(?:[_-].*)?|system(?:[_-].*)?|instructions?|control|tool(?:[_-].*)?|script|style|pre|code|textarea|与此同时)$/i;
 const VOID = new Set('area base br col embed hr img input link meta param source track wbr'.split(' '));
